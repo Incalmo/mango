@@ -19,9 +19,9 @@ from pydantic import (
     model_validator,
 )
 
-from nix2rle.runtime.manifest import RuntimeDeclaration
-from nix2rle.runtime.materialize import verifier_environments
-from nix2rle.runtime.task import relative_path
+from mango.runtime.manifest import RuntimeDeclaration
+from mango.runtime.materialize import verifier_environments
+from mango.runtime.task import relative_path
 
 Name = Annotated[str, Field(pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$")]
 Attribute = Annotated[str, Field(min_length=1)]

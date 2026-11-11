@@ -13,10 +13,10 @@ import yaml
 from pydantic import ValidationError
 
 HARNESS = Path(__file__).resolve().parents[2]
-from nix2rle.cli import execute, prepare_runtime
-from nix2rle.environment.declaration import EnvironmentManifest, load_manifest
-from nix2rle.environment.workspace import workspace_lock
-from nix2rle.runtime.manifest import BuildManifest
+from mango.cli import execute, prepare_runtime
+from mango.environment.declaration import EnvironmentManifest, load_manifest
+from mango.environment.workspace import workspace_lock
+from mango.runtime.manifest import BuildManifest
 from tests.support import write_recipe
 
 
@@ -70,8 +70,8 @@ class EnvironmentManifestTests(unittest.TestCase):
             for index, name in enumerate(app.images, start=1)
         }
         with (
-            patch("nix2rle.cli.instantiate", return_value=drvs),
-            patch("nix2rle.cli.load", return_value=refs),
+            patch("mango.cli.instantiate", return_value=drvs),
+            patch("mango.cli.load", return_value=refs),
         ):
             execute(Namespace(action="load"), self.root, app, work, mappings)
         loaded = json.loads((work / "images.json").read_text())
@@ -180,7 +180,7 @@ class EnvironmentManifestTests(unittest.TestCase):
 
     def test_declaration_action_prints_declaration_and_runtime(self):
         result = subprocess.run(
-            [sys.executable, "-m", "nix2rle", str(self.root), "declaration"],
+            [sys.executable, "-m", "mango", str(self.root), "declaration"],
             text=True, capture_output=True,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -192,7 +192,7 @@ class EnvironmentManifestTests(unittest.TestCase):
 
     def test_harbor_arguments_only_with_run(self):
         result = subprocess.run(
-            [sys.executable, "-m", "nix2rle", str(self.root), "validate", "--", "--model", "x"],
+            [sys.executable, "-m", "mango", str(self.root), "validate", "--", "--model", "x"],
             text=True, capture_output=True,
         )
         self.assertNotEqual(result.returncode, 0)
@@ -200,7 +200,7 @@ class EnvironmentManifestTests(unittest.TestCase):
 
     def test_validate_needs_no_build_or_workspace(self):
         result = subprocess.run(
-            [sys.executable, "-m", "nix2rle", str(self.root), "validate"],
+            [sys.executable, "-m", "mango", str(self.root), "validate"],
             text=True,
             capture_output=True,
         )
@@ -216,7 +216,7 @@ class WorkspaceTests(unittest.TestCase):
             other = Path(directory) / "other"
             code = (
                 "import sys; from pathlib import Path; "
-                "from nix2rle.environment.workspace import workspace_lock\n"
+                "from mango.environment.workspace import workspace_lock\n"
                 "with workspace_lock(Path(sys.argv[1])): pass\n"
             )
 

@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from nix2rle.outputs.oci import restore_runtime_config
+from mango.outputs.oci import restore_runtime_config
 
 
 class OciConfigTests(unittest.TestCase):

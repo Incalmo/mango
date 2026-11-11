@@ -11,9 +11,9 @@ from pathlib import Path
 import yaml
 
 REPO = Path(__file__).resolve().parents[2]
-from nix2rle.cli import build_digest, export_source, instantiate
-from nix2rle.environment.declaration import load_manifest
-from nix2rle.runtime.materialize import verifier_environments
+from mango.cli import build_digest, export_source, instantiate
+from mango.environment.declaration import load_manifest
+from mango.runtime.materialize import verifier_environments
 from tests.support import separate_grader_toml
 
 
@@ -71,7 +71,7 @@ class ExportTests(unittest.TestCase):
 
     def command(self, action, *args):
         return subprocess.run(
-            [sys.executable, "-m", "nix2rle", str(self.bundle), action, *args],
+            [sys.executable, "-m", "mango", str(self.bundle), action, *args],
             # The relocated bundle's own package, never this checkout's.
             env=dict(os.environ, PYTHONPATH=str(self.root / "src")),
             cwd="/",

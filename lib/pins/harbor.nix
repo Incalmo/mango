@@ -1,5 +1,5 @@
-# Harbor CLI pinned to the release the runtime adapter (src/nix2rle/harbor/environment.py
-# and src/nix2rle/runtime/materialize.py) was written against: it overrides Harbor internals.
+# Harbor CLI pinned to the release the runtime adapter (src/mango/harbor/environment.py
+# and src/mango/runtime/materialize.py) was written against: it overrides Harbor internals.
 { pkgs }:
 let
   python = pkgs.python313;

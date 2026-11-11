@@ -14,8 +14,8 @@ from harbor.models.task.config import TaskConfig
 from harbor.models.task.verifier_mode import resolve_effective_verifier_env_config
 from harbor.models.trial.paths import TrialPaths
 
-from nix2rle.harbor.environment import PreloadedDockerEnvironment
-from nix2rle.runtime.materialize import verifier_variant
+from mango.harbor.environment import PreloadedDockerEnvironment
+from mango.runtime.materialize import verifier_variant
 
 
 class ComposeRenderer(PreloadedDockerEnvironment):
@@ -174,5 +174,5 @@ def generate_compose(work: Path, manifest):
         "graders": graders,
         "note": "Compose starts runtime services at their baseline network policy. "
         "It does not run solutions, grading, artifact transfer, or phase policy changes; "
-        "use Harbor oracle/nop via `nix2rle ENV run` for those.",
+        "use Harbor oracle/nop via `mango ENV run` for those.",
     }

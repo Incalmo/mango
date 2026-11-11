@@ -13,7 +13,7 @@ from pathlib import Path
 
 import yaml
 
-from nix2rle.runtime.manifest import BUILD_RECIPE_VERSION, BuildManifest
+from mango.runtime.manifest import BUILD_RECIPE_VERSION, BuildManifest
 
 SIDECAR_SERVICE = "harbor-docker-egress-control-sidecar"
 # File names shared with the hosted prebuilt-image adapter; keep them stable.

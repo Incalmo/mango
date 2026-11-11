@@ -5,7 +5,7 @@ description of mappings and topology. There is no `manifest.json`. Check it
 without building, Docker access or workspace mutation:
 
 ```sh
-nix-shell --run 'nix2rle /absolute/environment validate'
+nix-shell --run 'mango /absolute/environment validate'
 ```
 
 Success prints JSON containing `valid`, `services`, `verifiers`, and `images`.

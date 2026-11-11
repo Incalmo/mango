@@ -1,4 +1,4 @@
-"""nix2rle: declare reproducible learning environments in Nix, build them
+"""mango: declare reproducible learning environments in Nix, build them
 offline, and run them as Harbor tasks."""
 
 from pathlib import Path

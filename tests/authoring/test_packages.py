@@ -8,8 +8,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from nix2rle.authoring import packages
-from nix2rle.authoring.packages import LockedFile, LockError, LockRequest, PackageStage
+from mango.authoring import packages
+from mango.authoring.packages import LockedFile, LockError, LockRequest, PackageStage
 
 BASE = "docker.io/library/ubuntu@sha256:" + "a" * 64
 

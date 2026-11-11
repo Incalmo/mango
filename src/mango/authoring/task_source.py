@@ -233,7 +233,7 @@ def materialize(archive, descriptor, destination):
 
 
 def main():
-    parser = argparse.ArgumentParser(prog="python -m nix2rle.authoring.task_source", description=__doc__)
+    parser = argparse.ArgumentParser(prog="python -m mango.authoring.task_source", description=__doc__)
     sub = parser.add_subparsers(dest="action", required=True)
     materializer = sub.add_parser("materialize")
     materializer.add_argument("--archive", type=Path, required=True)

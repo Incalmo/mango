@@ -6,8 +6,8 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-from nix2rle.cli import EXIT_EVALUATION, Failure
-from nix2rle.environment.contract import validate_environment_contract
+from mango.cli import EXIT_EVALUATION, Failure
+from mango.environment.contract import validate_environment_contract
 
 
 class EnvironmentContractTests(unittest.TestCase):
@@ -44,7 +44,7 @@ in h.mkEnvironment {
 
     def test_cli_validates_environment_contract(self):
         result = subprocess.run(
-            [sys.executable, "-m", "nix2rle", str(self.root), "validate-contract"],
+            [sys.executable, "-m", "mango", str(self.root), "validate-contract"],
             capture_output=True,
             text=True,
             check=True,

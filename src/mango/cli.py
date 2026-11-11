@@ -1,4 +1,4 @@
-"""Build, retain, publish, export and run a nix2rle environment."""
+"""Build, retain, publish, export and run a mango environment."""
 
 import argparse
 import hashlib
@@ -8,14 +8,14 @@ import subprocess
 import sys
 from pathlib import Path
 
-from nix2rle import HARNESS
-from nix2rle.environment.declaration import load_manifest
-from nix2rle.environment.workspace import workspace_lock
-from nix2rle.outputs import offline
-from nix2rle.outputs.oci import load, push
-from nix2rle.runtime.manifest import BuildManifest
-from nix2rle.runtime.materialize import materialize_runtime
-from nix2rle.runtime.task import generate_task
+from mango import HARNESS
+from mango.environment.declaration import load_manifest
+from mango.environment.workspace import workspace_lock
+from mango.outputs import offline
+from mango.outputs.oci import load, push
+from mango.runtime.manifest import BuildManifest
+from mango.runtime.materialize import materialize_runtime
+from mango.runtime.task import generate_task
 
 #: Exit statuses for failures a hosted builder must tell apart. Argparse keeps 2.
 EXIT_EVALUATION = 10  # declaration or derivation evaluation failed: permanent
@@ -176,7 +176,7 @@ def export_source(root, destination):
 
 
 def main():
-    parser = argparse.ArgumentParser(prog="nix2rle", description=__doc__.split("\n")[0])
+    parser = argparse.ArgumentParser(prog="mango", description=__doc__.split("\n")[0])
     parser.add_argument(
         "environment", type=Path, help="customer-owned environment directory"
     )
@@ -232,7 +232,7 @@ def main():
     if not (root / "default.nix").is_file():
         parser.error(f"no default.nix at {root}")
     if args.action == "validate-contract":
-        from nix2rle.environment.contract import validate_environment_contract
+        from mango.environment.contract import validate_environment_contract
 
         print(json.dumps(validate_environment_contract(root), indent=2))
         return
@@ -387,7 +387,7 @@ def execute(args, root, declared, work, verifier_images):
             {name: links / name for name in app["images"]}, scratch=work / "tmp"
         )
         manifest = image_manifest(
-            declared, references, build_id="nix2rle-local", source_digest=digest
+            declared, references, build_id="mango-local", source_digest=digest
         )
         prepare_runtime(root, manifest, digest, work)
         (work / "images.json").write_text(manifest.model_dump_json(indent=2) + "\n")
@@ -397,12 +397,12 @@ def execute(args, root, declared, work, verifier_images):
         )
         prepare_runtime(root, current_manifest(), digest, work)
         if args.action == "compose":
-            from nix2rle.harbor.compose import generate_compose
+            from mango.harbor.compose import generate_compose
 
             result = generate_compose(work, current_manifest())
             result["grading"] = {
                 agent: [
-                    "nix2rle",
+                    "mango",
                     str(root),
                     "--workspace",
                     str(work),
@@ -414,7 +414,7 @@ def execute(args, root, declared, work, verifier_images):
             }
             print(json.dumps(result, indent=2))
         elif args.action == "run":
-            from nix2rle.harbor.verdict import run_trial
+            from mango.harbor.verdict import run_trial
 
             run_trial(root, work, HARNESS, args.agent, args.harbor_args)
     elif args.action in {"export", "offline-export"}:

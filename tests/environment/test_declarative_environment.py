@@ -12,8 +12,8 @@ from unittest.mock import patch
 import yaml
 
 REPO = Path(__file__).resolve().parents[2]
-from nix2rle.cli import execute
-from nix2rle.environment.declaration import evaluate_declaration, load_manifest
+from mango.cli import execute
+from mango.environment.declaration import evaluate_declaration, load_manifest
 
 
 class DeclarativeEnvironmentTests(unittest.TestCase):
@@ -80,9 +80,9 @@ in mkEnvironment {
             for i, name in enumerate(app.images, 1)
         }
         with (
-            patch("nix2rle.cli.HARNESS", REPO),
-            patch("nix2rle.cli.instantiate", return_value=drvs),
-            patch("nix2rle.cli.load", return_value=refs),
+            patch("mango.cli.HARNESS", REPO),
+            patch("mango.cli.instantiate", return_value=drvs),
+            patch("mango.cli.load", return_value=refs),
             contextlib.redirect_stdout(io.StringIO()),
         ):
             execute(Namespace(action="load"), self.root, app, self.work, mapping)
@@ -101,12 +101,12 @@ in mkEnvironment {
         self.test_load_materializes_complete_runtime_and_preserves_source()
         app = load_manifest(self.root, REPO)
         with (
-            patch("nix2rle.cli.HARNESS", REPO),
+            patch("mango.cli.HARNESS", REPO),
             patch(
-                "nix2rle.cli.instantiate",
+                "mango.cli.instantiate",
                 return_value=["/nix/store/test.drv"] * len(app.attributes),
             ),
-            patch("nix2rle.harbor.compose.verify_local_images"),
+            patch("mango.harbor.compose.verify_local_images"),
             contextlib.redirect_stdout(io.StringIO()) as output,
         ):
             execute(

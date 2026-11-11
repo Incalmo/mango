@@ -17,7 +17,7 @@ import tempfile
 from pathlib import Path
 
 #: Not a resolvable registry: references can only be satisfied locally.
-REPOSITORY = "nix2rle.local"
+REPOSITORY = "mango.local"
 
 
 def require_containerd_store():

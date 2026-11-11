@@ -2,12 +2,12 @@
 
 from pathlib import Path
 
-from nix2rle import HARNESS
-from nix2rle.cli import instantiate
-from nix2rle.environment.declaration import load_manifest
-from nix2rle.runtime.task import validate
+from mango import HARNESS
+from mango.cli import instantiate
+from mango.environment.declaration import load_manifest
+from mango.runtime.task import validate
 
-FORMAT = "nix2rle-environment/1"
+FORMAT = "mango-environment/1"
 
 
 def validate_environment_contract(root: Path) -> dict:

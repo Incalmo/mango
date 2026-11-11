@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 REPO = Path(__file__).resolve().parents[2]
-from nix2rle.harbor.verdict import inspect_job, run_trial
+from mango.harbor.verdict import inspect_job, run_trial
 
 
 class TrialVerdictTests(unittest.TestCase):
@@ -68,7 +68,7 @@ class TrialVerdictTests(unittest.TestCase):
             return subprocess.CompletedProcess(command, 0)
 
         with (
-            patch("nix2rle.harbor.verdict.subprocess.run", side_effect=harbor),
+            patch("mango.harbor.verdict.subprocess.run", side_effect=harbor),
             contextlib.redirect_stdout(io.StringIO()),
         ):
             return run_trial(self.root, self.work, REPO, agent, list(harbor_args))

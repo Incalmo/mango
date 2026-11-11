@@ -6,7 +6,7 @@ commit only their output. Builds read the committed pins and locks offline.
 ## Pin a base image
 
 ```sh
-nix-shell --run 'nix2rle-pin-base docker.io/library/ubuntu:22.04 --nix'
+nix-shell --run 'mango-pin-base docker.io/library/ubuntu:22.04 --nix'
 ```
 
 Resolves a tag to its linux/amd64 manifest digest, then fetches that digest
@@ -17,7 +17,7 @@ with `fetchLinuxBase` to learn the Nix content hash. The printed
 ## Lock distro packages
 
 ```sh
-nix-shell --run 'nix2rle-lock-packages --lock "$ENV/inputs.lock.json" --manager apt \
+nix-shell --run 'mango-lock-packages --lock "$ENV/inputs.lock.json" --manager apt \
   --base docker.io/library/ubuntu@sha256:<digest> \
   --source "deb https://snapshot.ubuntu.com/ubuntu/20261001T000000Z noble main universe" \
   --stage "ca-certificates python3" --stage "build-essential"'
@@ -33,10 +33,10 @@ sources and stages, so changing any of them selects a new prefix. Entries under
 the request's prefixes are replaced; other entries are kept. The command prints
 the prefixes. Use dated archive snapshots so the URLs keep serving the same bytes.
 
-From Python, `nix2rle.authoring.packages.lock_request(LockRequest(...), lock)`
+From Python, `mango.authoring.packages.lock_request(LockRequest(...), lock)`
 also accepts a per-stage `target_release` (apt `-t`) and `extra_sources`.
-Resolutions are cached by key in `NIX2RLE_LOCK_CACHE` (default
-`~/.cache/nix2rle/locks`); `NIX2RLE_LOCK_OFFLINE=1` makes a cache miss an error.
+Resolutions are cached by key in `MANGO_LOCK_CACHE` (default
+`~/.cache/mango/locks`); `MANGO_LOCK_OFFLINE=1` makes a cache miss an error.
 
 Install each stage offline, in order, in a `mkLinuxImage` stage:
 

@@ -14,7 +14,7 @@ from unittest.mock import patch
 
 import zstandard
 
-from nix2rle.authoring import task_source
+from mango.authoring import task_source
 
 #: A registry's canonical manifest format, supplied by the descriptor.
 RULES = [{"header": "example-manifest-v1", "exclude": []}]
@@ -120,7 +120,7 @@ class TaskSourceTests(unittest.TestCase):
             publish(source, destination)
 
         with (
-            patch("nix2rle.authoring.task_source.publish_no_replace", side_effect=race),
+            patch("mango.authoring.task_source.publish_no_replace", side_effect=race),
             self.assertRaises(FileExistsError),
         ):
             task_source.materialize(self.archive, self.descriptor, self.target)

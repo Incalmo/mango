@@ -11,7 +11,7 @@ from pathlib import Path
 
 HARNESS = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(HARNESS / "builders"))
-from nix2rle.outputs.oci import load_one, require_containerd_store
+from mango.outputs.oci import load_one, require_containerd_store
 from rootfs import BaseImage
 
 

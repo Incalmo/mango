@@ -1,6 +1,6 @@
-# nix2rle
+# mango
 
-The [nix2rle](https://github.com/Incalmo/nix2rle) harness builds reproducible learning environments.
+The [mango](https://github.com/Incalmo/mango) harness builds reproducible learning environments.
 Declare packages, containers, and service topology in Nix. Source packages carry
 their pins and patches; binary packages carry their download hashes. The harness
 builds without network access and generates runtime Compose from the declaration.
@@ -56,8 +56,8 @@ See [pinned images](docs/pinned-images.md) for an exact upstream image without a
 See [Linux images](docs/linux-images.md) to preserve a distro's filesystem and installers
 without translating a Dockerfile.
 See [authoring tools](docs/authoring-tools.md) to pin a registry base image
-(`nix2rle-pin-base`) and to lock the exact package files of apt or opkg installs
-(`nix2rle-lock-packages`).
+(`mango-pin-base`) and to lock the exact package files of apt or opkg installs
+(`mango-lock-packages`).
 See [pinned-file serving](docs/pinned-files.md) when an offline package manager
 needs HTTP URLs for explicitly mapped local inputs. Run
 `incalmo-pinned-files --map map.json -- your-command` with immutable pinned files;
@@ -75,16 +75,16 @@ An environment is a directory whose [declarative](docs/declarative-environments.
 beside its Harbor `task/`. The harness generates the runtime Compose
 configuration; no manifest or source Compose file is authored.
 
-The `nix2rle` command (on the path inside `nix-shell`) takes that directory.
+The `mango` command (on the path inside `nix-shell`) takes that directory.
 Run from this checkout, replacing the absolute paths with your own:
 
 ```sh
-nix-shell --run 'nix2rle /path/to/environment validate'
-nix-shell --run 'nix2rle /path/to/environment fetch'
-nix-shell --run 'nix2rle /path/to/environment check'
-nix-shell --run 'nix2rle /path/to/environment load'
-nix-shell --run 'nix2rle /path/to/environment compose'
-nix-shell --run 'nix2rle /path/to/environment run --agent nop'
+nix-shell --run 'mango /path/to/environment validate'
+nix-shell --run 'mango /path/to/environment fetch'
+nix-shell --run 'mango /path/to/environment check'
+nix-shell --run 'mango /path/to/environment load'
+nix-shell --run 'mango /path/to/environment compose'
+nix-shell --run 'mango /path/to/environment run --agent nop'
 ```
 
 Generated state defaults to the environment's sibling `build/<directory-name>/`.
@@ -127,7 +127,7 @@ tree, with no Nix. Hosted builders use it; see [hosted builds](docs/hosted-build
 
 `export --destination /new/bundle` copies the supplied environment and harness
 into a relocatable directory. Run it with
-`nix-shell /new/bundle/shell.nix --run 'nix2rle /new/bundle/environment ...'`. Exports include the supplied source tree: review it
+`nix-shell /new/bundle/shell.nix --run 'mango /new/bundle/environment ...'`. Exports include the supplied source tree: review it
 for secrets before distribution. They do not include this checkout's history,
 tests or internal development state.
 
@@ -153,12 +153,12 @@ never the publisher's private signing key.
 | `lib/images/` | Image builders: nix2container, native distro VM, pinned images, egress sidecar |
 | `lib/adapters/` | Hash-pinned fetchers and package-manager cache layouts |
 | `lib/pins/` | Pinned nixpkgs, nix2container and Harbor |
-| `src/nix2rle/` | Python package and `nix2rle` command |
-| `src/nix2rle/environment/` | Declaration loading, environment contract, workspace locking |
-| `src/nix2rle/outputs/` | Offline retention and rebuild checks, image load and registry push |
-| `src/nix2rle/runtime/` | Nix-free task generation and image binding (vendored by hosts) |
-| `src/nix2rle/harbor/` | Harbor environment adapter, local Compose, trial verdicts |
-| `src/nix2rle/authoring/` | Network-using authoring tools: base pins, apt locks, task sources |
+| `src/mango/` | Python package and `mango` command |
+| `src/mango/environment/` | Declaration loading, environment contract, workspace locking |
+| `src/mango/outputs/` | Offline retention and rebuild checks, image load and registry push |
+| `src/mango/runtime/` | Nix-free task generation and image binding (vendored by hosts) |
+| `src/mango/harbor/` | Harbor environment adapter, local Compose, trial verdicts |
+| `src/mango/authoring/` | Network-using authoring tools: base pins, apt locks, task sources |
 | `builders/` | Standard-library scripts run inside Nix builds |
 | `tests/` | Tests by area; `tests/support/` holds fixtures and extra shells |
 
