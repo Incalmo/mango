@@ -88,6 +88,20 @@ class Adapters(unittest.TestCase):
                 ["service/cache/file.bin"],
             )
 
+    def test_locked_inputs_select_prefixes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            lock = Path(directory) / "inputs.lock.json"
+            lock.write_text(json.dumps({"schema_version": 1, "artifacts": [
+                {"path": "apt/one/0/a.deb", "urls": [self.url], "sha256": HASH},
+                {"path": "apt/two/0/b.deb", "urls": [self.url], "sha256": HASH},
+                {"path": "apt/one-other/c.deb", "urls": [self.url], "sha256": HASH},
+            ]}))
+            output = self.build(
+                f'a.fetchLockedInputs {{ lock = {lock}; name = "subset"; prefixes = [ "apt/one" ]; }}'
+            )
+            files = sorted(str(p.relative_to(output)) for p in output.rglob("*") if p.is_file())
+            self.assertEqual(files, ["apt/one/0/a.deb"])
+
     def test_sha512_only_inputs_and_exactly_one_hash(self):
         sha512 = hashlib.sha512(PAYLOAD).hexdigest()
         with tempfile.TemporaryDirectory() as directory:

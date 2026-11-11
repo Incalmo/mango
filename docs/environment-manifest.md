@@ -9,7 +9,7 @@ nix-shell --run 'nix2rle /absolute/environment validate'
 ```
 
 Success prints JSON containing `valid`, `services`, `verifiers`, and `images`.
-Failure exits nonzero with the invalid field or mapping. `validate-factory`
+Failure exits nonzero with the invalid field or mapping. `validate-contract`
 additionally rejects authored Dockerfiles/Compose files and external symlinks
 (including Nix `result` links) and instantiates every image and build output.
 Neither command builds anything or qualifies a task.

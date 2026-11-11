@@ -67,13 +67,21 @@ in {
   cargoSetupHook = pkgs.rustPlatform.cargoSetupHook;
   # The authoring agent supplies the complete inventory. No discovery, package
   # resolution, lockfile translation or command inspection takes place here.
-  fetchLockedInputs = { lock, name ? "environment-inputs" }:
-    let document = builtins.fromJSON (builtins.readFile lock);
+  # `prefixes` selects the entries one image needs (a path equal to a prefix or
+  # under it), so an image's inputs never change when another image's do.
+  fetchLockedInputs = { lock, name ? "environment-inputs", prefixes ? null }:
+    let
+      document = builtins.fromJSON (builtins.readFile lock);
+      wanted = artifact: prefixes == null || builtins.any
+        (prefix: artifact.path == prefix || lib.hasPrefix (prefix + "/") artifact.path)
+        prefixes;
     in assert lib.assertMsg ((document.schema_version or null) == 1)
       "inputs lock requires schema_version = 1";
       assert lib.assertMsg (builtins.isList (document.artifacts or null))
         "inputs lock requires an explicit artifacts list";
-      fetchDependencyCache { inherit name; inherit (document) artifacts; };
+      assert lib.assertMsg (prefixes == null || builtins.all builtins.isString prefixes)
+        "fetchLockedInputs prefixes must be a list of path strings";
+      fetchDependencyCache { inherit name; artifacts = builtins.filter wanted document.artifacts; };
 
   fetchMavenCache = { lock, name ? "maven-repository" }:
     let

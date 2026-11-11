@@ -1,6 +1,12 @@
 # Inspect local trial results
 
-`nix2rle ENV run --agent oracle|nop` runs one trial in a fresh, uniquely named
+`--agent` accepts `oracle`, `nop` or any agent the pinned Harbor provides.
+Arguments after a bare `--` are passed to `harbor run` unchanged, for example
+`-- --model provider/model --agent-kwarg key=value --allow-agent-host host`.
+The harness adds only the task path, the prebuilt-image environment class and
+the job location; credentials and model settings stay with the caller.
+
+`nix2rle ENV run --agent AGENT [-- HARBOR_ARGS...]` runs one trial in a fresh, uniquely named
 Harbor job with retries disabled. It does not inspect the newest directory or
 reuse a result from a previous invocation. Harbor output goes to stderr; stdout
 contains the structured verdict JSON.

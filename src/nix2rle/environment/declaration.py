@@ -31,6 +31,7 @@ DECLARATION_VERSION = 1
 class EnvironmentManifest(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     _compose_documents: dict[str, dict] = PrivateAttr(default_factory=dict)
+    _declaration: dict = PrivateAttr(default_factory=dict)
 
     name: str
     platform: Literal["linux/amd64"] = "linux/amd64"
@@ -174,6 +175,7 @@ def load_manifest(root: Path, harness: Path) -> EnvironmentManifest:
         for key, (context, _) in contexts.items()
     }
     manifest = EnvironmentManifest.model_validate(document)
+    manifest._declaration = declaration
     manifest._compose_documents = {
         "environment": declaration["compose"],
         **declaration["verifierCompose"],

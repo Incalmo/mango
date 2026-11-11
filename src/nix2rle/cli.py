@@ -189,7 +189,8 @@ def main():
         "action",
         choices=[
             "validate",
-            "validate-factory",
+            "declaration",
+            "validate-contract",
             "build",
             "fetch",
             "check",
@@ -203,7 +204,12 @@ def main():
             "offline-import",
         ],
     )
-    parser.add_argument("--agent", choices=["oracle", "nop"], default="nop")
+    parser.add_argument(
+        "--agent",
+        default="nop",
+        help="Harbor agent for run (oracle, nop or any installed agent); "
+        "arguments after a bare -- are passed to `harbor run` unchanged",
+    )
     parser.add_argument("--destination", type=Path)
     publish = parser.add_argument_group("publish")
     publish.add_argument("--repository", help="registry repository prefix")
@@ -213,20 +219,37 @@ def main():
     )
     publish.add_argument("--authfile", type=Path, help="registry auth file")
     publish.add_argument("--output", type=Path, help="write the manifest here")
-    args = parser.parse_args()
+    argv = sys.argv[1:]
+    harbor_args = []
+    if "--" in argv:
+        split = argv.index("--")
+        argv, harbor_args = argv[:split], argv[split + 1 :]
+    args = parser.parse_args(argv)
+    args.harbor_args = harbor_args
+    if harbor_args and args.action != "run":
+        parser.error("arguments after -- are only accepted by run")
     root = args.environment.resolve()
     if not (root / "default.nix").is_file():
         parser.error(f"no default.nix at {root}")
-    if args.action == "validate-factory":
-        from nix2rle.environment.contract import validate_factory_task
+    if args.action == "validate-contract":
+        from nix2rle.environment.contract import validate_environment_contract
 
-        print(json.dumps(validate_factory_task(root), indent=2))
+        print(json.dumps(validate_environment_contract(root), indent=2))
         return
     try:
         app = load_manifest(root, HARNESS)
         verifier_images = app.validate_task_mappings(root)
     except ValueError as error:
         report(Failure(EXIT_EVALUATION, "evaluation", str(error)))
+    if args.action == "declaration":
+        # The evaluated declaration, plus the Nix-free runtime it generates.
+        print(
+            json.dumps(
+                app._declaration | {"runtime": app.runtime().model_dump()},
+                indent=2,
+            )
+        )
+        return
     if args.action == "validate":
         print(
             json.dumps(
@@ -393,7 +416,7 @@ def execute(args, root, declared, work, verifier_images):
         elif args.action == "run":
             from nix2rle.harbor.verdict import run_trial
 
-            run_trial(root, work, HARNESS, args.agent)
+            run_trial(root, work, HARNESS, args.agent, args.harbor_args)
     elif args.action in {"export", "offline-export"}:
         if args.destination is None:
             raise ValueError("--destination is required")

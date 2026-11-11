@@ -12,7 +12,7 @@ harbor = ["harbor==0.23.0"]
 [project.scripts]
 nix2rle = "nix2rle.cli:main"
 nix2rle-pin-base = "nix2rle.authoring.pin_base:main"
-nix2rle-apt-lock = "nix2rle.authoring.apt_lock:main"
+nix2rle-lock-packages = "nix2rle.authoring.packages:main"
 
 [build-system]
 requires = ["setuptools>=69"]

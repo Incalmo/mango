@@ -30,9 +30,10 @@ Pin this repository to an immutable revision when distributing an environment.
 | --- | --- |
 | `mkEnvironment` | Declare containers, services, networks and graders once; generate mappings and Compose |
 | `mkContainer` | Declare a pinned base, packages, files and runtime settings |
+| `pythonVerifier` | A grader container with the task's tests on a minimal Python userland |
 | `mkSourcePackage` | Build explicit source and patches offline |
 | `mkBinaryPackage` | Install pinned binary files or archives |
-| `dependencies` | Hash-pinned fetchers, package-manager cache layouts and offline application builds |
+| `dependencies` | Hash-pinned fetchers (`fetchLockedInputs { lock; prefixes ? null; }`), package-manager cache layouts and offline application builds |
 | `mkImage` | Build a nix2container image from packages, application outputs and OCI configuration |
 | `requireTaskArchive` | Reuse an explicitly supplied original task archive by SHA-256 in the Nix store |
 | `fetchLinuxBase` | Fetch a base image pinned by manifest digest and Nix content hash |
@@ -55,7 +56,8 @@ See [pinned images](docs/pinned-images.md) for an exact upstream image without a
 See [Linux images](docs/linux-images.md) to preserve a distro's filesystem and installers
 without translating a Dockerfile.
 See [authoring tools](docs/authoring-tools.md) to pin a registry base image
-(`pin_base.py`) and to lock the exact `.deb` set of an apt install (`apt_lock.py`).
+(`nix2rle-pin-base`) and to lock the exact package files of apt or opkg installs
+(`nix2rle-lock-packages`).
 See [pinned-file serving](docs/pinned-files.md) when an offline package manager
 needs HTTP URLs for explicitly mapped local inputs. Run
 `incalmo-pinned-files --map map.json -- your-command` with immutable pinned files;
@@ -89,7 +91,7 @@ Generated state defaults to the environment's sibling `build/<directory-name>/`.
 Use the same `--workspace /path/to/state` on every command to override it.
 Commands lock that workspace until they finish; parallel builds need separate
 workspaces. `validate` checks authored mappings without building or creating state.
-`validate-factory` additionally rejects authored Dockerfiles/Compose files and evaluates every
+`validate-contract` additionally rejects authored Dockerfiles/Compose files and evaluates every
 image and application build output. It reports neither a build nor qualification
 as passed; use the actual build and runtime checks for those claims.
 Source files are not rewritten. `run` reports actual trial rewards as JSON and
@@ -152,7 +154,7 @@ never the publisher's private signing key.
 | `lib/adapters/` | Hash-pinned fetchers and package-manager cache layouts |
 | `lib/pins/` | Pinned nixpkgs, nix2container and Harbor |
 | `src/nix2rle/` | Python package and `nix2rle` command |
-| `src/nix2rle/environment/` | Declaration loading, factory contract, workspace locking |
+| `src/nix2rle/environment/` | Declaration loading, environment contract, workspace locking |
 | `src/nix2rle/outputs/` | Offline retention and rebuild checks, image load and registry push |
 | `src/nix2rle/runtime/` | Nix-free task generation and image binding (vendored by hosts) |
 | `src/nix2rle/harbor/` | Harbor environment adapter, local Compose, trial verdicts |

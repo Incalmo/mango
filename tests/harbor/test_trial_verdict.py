@@ -52,8 +52,11 @@ class TrialVerdictTests(unittest.TestCase):
             )
         )
 
-    def invoke(self, agent, create):
+    def invoke(self, agent, create, harbor_args=()):
+        self.commands = []
+
         def harbor(command, **kwargs):
+            self.commands.append(command)
             self.assertEqual(command[:2], ["harbor", "run"])
             self.assertEqual(command[command.index("--n-attempts") + 1], "1")
             self.assertEqual(command[command.index("--max-retries") + 1], "0")
@@ -68,7 +71,7 @@ class TrialVerdictTests(unittest.TestCase):
             patch("nix2rle.harbor.verdict.subprocess.run", side_effect=harbor),
             contextlib.redirect_stdout(io.StringIO()),
         ):
-            return run_trial(self.root, self.work, REPO, agent)
+            return run_trial(self.root, self.work, REPO, agent, list(harbor_args))
 
     def test_zero_exit_infrastructure_exception_fails_and_retains_verdict(self):
         with self.assertRaisesRegex(ValueError, "did not complete successfully"):
@@ -89,6 +92,18 @@ class TrialVerdictTests(unittest.TestCase):
         self.assertFalse(verdict["execution_complete"])
         self.assertEqual(verdict["harbor_exit_code"], 0)
         self.assertTrue(any("Trial exception" in e for e in verdict["errors"]))
+
+    def test_any_agent_with_passthrough_harbor_arguments(self):
+        extra = ["--model", "provider/model", "--agent-kwarg", "reasoning=high"]
+        result = self.invoke(
+            "terminus-2",
+            lambda job: self.write_result(job, agent="terminus-2", reward=0.5),
+            harbor_args=extra,
+        )
+        (command,) = self.commands
+        self.assertEqual(command[command.index("--agent") + 1], "terminus-2")
+        self.assertEqual(command[-len(extra):], extra)
+        self.assertEqual(result["trials"][0]["rewards"], {"reward": 0.5})
 
     def test_missing_result_does_not_reuse_an_old_success(self):
         self.write_result(self.job)

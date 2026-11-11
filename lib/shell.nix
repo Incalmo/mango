@@ -18,7 +18,7 @@ in pkgs.mkShell {
     pkgs.util-linux
     (command "nix2rle" "nix2rle")
     (command "nix2rle-pin-base" "nix2rle.authoring.pin_base")
-    (command "nix2rle-apt-lock" "nix2rle.authoring.apt_lock")
+    (command "nix2rle-lock-packages" "nix2rle.authoring.packages")
   ];
   shellHook = ''
     export PYTHONPATH=${source}''${PYTHONPATH:+:$PYTHONPATH}
