@@ -189,7 +189,7 @@ def main():
         "action",
         choices=[
             "validate",
-            "validate-factory",
+            "validate-contract",
             "build",
             "fetch",
             "check",
@@ -217,10 +217,10 @@ def main():
     root = args.environment.resolve()
     if not (root / "default.nix").is_file():
         parser.error(f"no default.nix at {root}")
-    if args.action == "validate-factory":
-        from nix2rle.environment.contract import validate_factory_task
+    if args.action == "validate-contract":
+        from nix2rle.environment.contract import validate_environment_contract
 
-        print(json.dumps(validate_factory_task(root), indent=2))
+        print(json.dumps(validate_environment_contract(root), indent=2))
         return
     try:
         app = load_manifest(root, HARNESS)

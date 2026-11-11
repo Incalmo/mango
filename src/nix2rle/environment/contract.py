@@ -1,4 +1,4 @@
-"""Validate an explicitly authored factory output, without discovering dependencies."""
+"""Validate an explicitly authored environment, without discovering dependencies."""
 
 from pathlib import Path
 
@@ -10,19 +10,19 @@ from nix2rle.runtime.task import validate
 FORMAT = "nix2rle-environment/1"
 
 
-def validate_factory_task(root: Path) -> dict:
+def validate_environment_contract(root: Path) -> dict:
     """Check layout, declaration and that every output evaluates to a derivation.
 
-    This is the contract a hosted builder applies first. It builds nothing and
+    This checks the environment contract before building. It builds nothing and
     claims neither a build nor a qualification result.
     """
     root = root.resolve(strict=True)
     if not (root / "default.nix").is_file():
-        raise ValueError("Factory output requires default.nix returning mkEnvironment")
+        raise ValueError("Environment requires default.nix returning mkEnvironment")
     for path in root.rglob("*"):
         if path.is_symlink() and not path.resolve().is_relative_to(root):
             raise ValueError(
-                f"Factory output has an external symlink: {path.relative_to(root)}"
+                f"Environment has an external symlink: {path.relative_to(root)}"
             )
     app = load_manifest(root, HARNESS)
     verifiers = app.validate_task_mappings(root)

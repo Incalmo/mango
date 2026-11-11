@@ -89,7 +89,7 @@ Generated state defaults to the environment's sibling `build/<directory-name>/`.
 Use the same `--workspace /path/to/state` on every command to override it.
 Commands lock that workspace until they finish; parallel builds need separate
 workspaces. `validate` checks authored mappings without building or creating state.
-`validate-factory` additionally rejects authored Dockerfiles/Compose files and evaluates every
+`validate-contract` additionally rejects authored Dockerfiles/Compose files and evaluates every
 image and application build output. It reports neither a build nor qualification
 as passed; use the actual build and runtime checks for those claims.
 Source files are not rewritten. `run` reports actual trial rewards as JSON and
@@ -152,7 +152,7 @@ never the publisher's private signing key.
 | `lib/adapters/` | Hash-pinned fetchers and package-manager cache layouts |
 | `lib/pins/` | Pinned nixpkgs, nix2container and Harbor |
 | `src/nix2rle/` | Python package and `nix2rle` command |
-| `src/nix2rle/environment/` | Declaration loading, factory contract, workspace locking |
+| `src/nix2rle/environment/` | Declaration loading, environment contract, workspace locking |
 | `src/nix2rle/outputs/` | Offline retention and rebuild checks, image load and registry push |
 | `src/nix2rle/runtime/` | Nix-free task generation and image binding (vendored by hosts) |
 | `src/nix2rle/harbor/` | Harbor environment adapter, local Compose, trial verdicts |
