@@ -1,0 +1,21 @@
+name: Dependency adapters
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31
+        with:
+          extra_nix_config: |
+            sandbox = true
+            sandbox-fallback = false
+      - run: nix-shell --run 'python -m unittest discover -s tests -t . -p "test_*.py" -v'
+      - run: nix-shell --run 'bash tests/support/check-cache-offline-fixture.sh'
+      - run: nix-shell --run 'ruff check src builders tests'

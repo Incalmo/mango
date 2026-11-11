@@ -1,0 +1,5 @@
+Base sidecar files: Harbor 0.23.0, environments/docker/harbor-docker-egress-control-sidecar.
+Public wheel SHA256: 8747400dbb2a5e2298e1338e17e88eba38433c0433fd700f34d1a9021bba5c37.
+Network-policy and helper modifications by Incalmo, vendored for standalone
+execution. lib/images/egress.nix builds the image; the original Dockerfile is
+omitted.

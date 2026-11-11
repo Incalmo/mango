@@ -1,0 +1,10 @@
+nix2rle: reproducible learning environment build harness
+
+Original harness code is provided under the MIT license in LICENSE.
+
+vendor/egress contains Harbor-derived sidecar code and Incalmo modifications.
+Its Apache 2.0 license and source provenance are preserved in that directory.
+
+Nixpkgs, nix2container, Harbor and packages fetched by Nix retain their own
+licenses. The harness license does not relicense downloaded dependencies or
+customer environment contents.

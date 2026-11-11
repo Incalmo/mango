@@ -1,0 +1,20 @@
+#!/bin/sh
+set -eu
+
+# Private addresses the namespace has no connected route to. Runs after
+# range-bypass-rules, so the environment's own subnets have already matched.
+
+case "${1:-}" in
+  # nat: skip the redirect, so the routing table answers as it would unproxied.
+  return) action=return ;;
+  # filter: a routable private host must not be reached off the default route.
+  accept) action=drop ;;
+  *) exit 2 ;;
+esac
+
+for prefix in 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16; do
+  printf '    ip daddr %s %s\n' "$prefix" "$action"
+done
+for prefix in fc00::/7; do
+  printf '    ip6 daddr %s %s\n' "$prefix" "$action"
+done

@@ -1,0 +1,77 @@
+#!/bin/sh
+set -eu
+
+# Keep the environment's own subnets off the transparent proxy.
+#
+# Harbor's policy redirects every TCP flow to gost, and gost decides whether a
+# destination is allowed only after accept(2) has already completed -- its
+# bypass check returns ErrBypass from Handle(), which closes a connection the
+# client has by then seen succeed. That is invisible to an agent solving a
+# coding task and fatal to a network range: connect() succeeds against every
+# address and port, so nmap and nc report whole subnets open and a solver
+# cannot tell a live service from the proxy. An agent run against an AD range
+# spent its entire budget reverse-engineering that instead of attacking, so
+# allowlisting in-range destinations is not enough -- they have to miss the
+# redirect altogether.
+#
+# Traffic to a directly-connected subnet is in-range by construction, so it
+# bypasses the proxy and behaves as it would on a real network. Internet-bound
+# traffic has no connected route, falls through to the redirect, and the
+# allowlist still decides.
+#
+# The interface holding the default route is the way out of the namespace,
+# never a range bridge: the generator marks range networks `internal`, leaving
+# them with no gateway, so the sidecar's own egress network holds the only
+# default route. If there is no default route, or a connected subnet shares
+# that interface, emit nothing -- a proxied range is recoverable, a silently
+# unfiltered one is not.
+
+case "${1:-}" in
+  return|accept) ;;
+  *) exit 2 ;;
+esac
+action="$1"
+
+dev_of() { # reads a route line on stdin
+  awk '{for (i = 1; i < NF; i++) if ($i == "dev") { print $(i + 1); exit }}'
+}
+
+# `route get` beats `route show default` when policy routing or several
+# defaults are present.
+default_dev=$(ip -4 route get 1.1.1.1 2>/dev/null | dev_of || true)
+default_dev6=$(ip -6 route get 2606:4700:4700::1111 2>/dev/null | dev_of || true)
+
+emit() { # family cidr dev skip_dev
+  [ -n "$2" ] && [ -n "$3" ] || return 0
+  case "$2" in
+    */*) ;;
+    *) return 0 ;;
+  esac
+  # A /32 or /128 is a peer route, not a subnet worth exempting.
+  case "$2" in
+    */32 | */128) return 0 ;;
+  esac
+  # Link-local and multicast are never range targets.
+  case "$2" in
+    169.254.* | fe80:* | ff00:* | 224.* | 225.* | 226.* | 227.* | 228.* \
+      | 229.* | 230.* | 231.* | 232.* | 233.* | 234.* | 235.* | 236.* \
+      | 237.* | 238.* | 239.*) return 0 ;;
+  esac
+  [ "$3" = "$4" ] && return 0
+  printf '    %s daddr %s %s\n' "$1" "$2" "$action"
+}
+
+# IPv4: connected prefixes carry scope link.
+if [ -n "$default_dev" ]; then
+  ip -4 route show scope link 2>/dev/null | while read -r cidr rest; do
+    emit ip "$cidr" "$(printf '%s' "$rest" | dev_of)" "$default_dev"
+  done
+fi
+
+# IPv6 connected routes are proto kernel with no link scope, so `scope link`
+# misses them; read the addresses instead and rebuild the prefix.
+if [ -n "$default_dev6" ]; then
+  ip -6 route show proto kernel 2>/dev/null | while read -r cidr rest; do
+    emit ip6 "$cidr" "$(printf '%s' "$rest" | dev_of)" "$default_dev6"
+  done
+fi

@@ -1,0 +1,117 @@
+#!/bin/sh
+set -eu
+
+# Only exact targets from Harbor's active allowlist receive private-address
+# exceptions. They still go through gost, which checks hostname and port.
+# Wildcards and networks do not expand into private-address exemptions.
+ALLOWLIST=/opt/egress-sidecar/allowlist.txt
+
+resolve_host() {
+  attempt=1
+  while [ "$attempt" -le 3 ]; do
+    if records=$(timeout 10 getent ahosts "$1"); then
+      if [ -n "$records" ]; then
+        printf '%s\n' "$records"
+        return 0
+      fi
+      failure="No addresses for allowlist endpoint: $1"
+    else
+      failure="Cannot resolve allowlist endpoint: $1"
+    fi
+    # Retry transient resolver failures without retaining partial answers or
+    # changing the requested hostname. Exhaustion still rejects the update.
+    if [ "$attempt" -lt 3 ]; then sleep 1; fi
+    attempt=$((attempt + 1))
+  done
+  echo "$failure" >&2
+  return 1
+}
+
+resolve_targets() {
+  while IFS= read -r target || [ -n "$target" ]; do
+    case "$target" in
+      ''|\#*|*'*'*|*'?'*|*'/'*) continue ;;
+    esac
+    # IP ranges are gost patterns, not DNS names.
+    if printf '%s\n' "$target" | grep -Eq '^[0-9.]+-[0-9.]+$'; then
+      continue
+    fi
+    port=''
+    case "$target" in
+      \[*\]:*) host=${target#\[}; host=${host%%\]*}; port=${target##*:} ;;
+      \[*\]) host=${target#\[}; host=${host%\]} ;;
+      *:*:*) host=$target ;;
+      *:*) host=${target%:*}; port=${target##*:} ;;
+      *) host=$target ;;
+    esac
+    # Reject syntax that could be interpreted as shell or nftables input.
+    case "$host" in ''|*[!a-zA-Z0-9._:-]*) continue ;; esac
+    if [ -n "$port" ]; then
+      case "$port" in *[!0-9]*) continue ;; esac
+      if [ "$port" -lt 1 ] || [ "$port" -gt 65535 ]; then
+        echo "Invalid allowlist endpoint port: $target" >&2
+        return 1
+      fi
+    fi
+    records=$(resolve_host "$host") || return 1
+    printf '%s\n' "$records" | awk '{print tolower($1)}' | sort -u |
+      while IFS= read -r address; do
+        case "$address" in *[!0-9a-f:.]*) continue ;; esac
+        case "$address" in
+          10.*|192.168.*|172.1[6-9].*|172.2[0-9].*|172.3[01].*) family=4 ;;
+          fc*:*|fd*:*) family=6 ;;
+          *) continue ;;
+        esac
+        if [ -n "$port" ]; then
+          printf 'v%s_ports %s . %s timeout 90s\n' "$family" "$address" "$port"
+        else
+          printf 'v%s %s timeout 90s\n' "$family" "$address"
+        fi
+      done
+  done < "$ALLOWLIST"
+}
+
+emit() {
+  mode=$1
+  # Resolve everything before emitting an atomic nft transaction. A failed
+  # lookup must never leave a partially refreshed set of exceptions.
+  entries=$(resolve_targets) || return 1
+  entries=$(printf '%s\n' "$entries" | sort -u)
+  for name in v4 v6 v4_ports v6_ports; do
+    case "$name" in
+      v4) type=ipv4_addr ;;
+      v6) type=ipv6_addr ;;
+      v4_ports) type='ipv4_addr . inet_service' ;;
+      v6_ports) type='ipv6_addr . inet_service' ;;
+    esac
+    elements=$(printf '%s\n' "$entries" | awk -v key="$name" '
+      $1 == key { $1=""; sub(/^ /, ""); if (n++) printf ", "; printf "%s", $0 }
+    ')
+    if [ "$mode" = sets ]; then
+      printf '  set incalmo_private_%s {\n    type %s\n' "$name" "$type"
+      printf '    flags timeout\n    timeout 90s\n'
+      if [ -n "$elements" ]; then printf '    elements = { %s }\n' "$elements"; fi
+      printf '  }\n'
+    else
+      printf 'flush set inet gost_egress incalmo_private_%s\n' "$name"
+      if [ -n "$elements" ]; then
+        printf 'add element inet gost_egress incalmo_private_%s { %s }\n' "$name" "$elements"
+      fi
+    fi
+  done
+}
+
+case "${1:-}" in
+  sets|update) emit "$1" ;;
+  clear)
+    for name in v4 v6 v4_ports v6_ports; do
+      printf 'flush set inet gost_egress incalmo_private_%s\n' "$name"
+    done
+    ;;
+  watch)
+    # network-policy takes the same lock for a refresh and a phase transition.
+    # The container owns this process; no worker or extra service is required.
+    while sleep 30; do network-policy refresh-private-endpoints || true; done
+    ;;
+  *) exit 2 ;;
+esac

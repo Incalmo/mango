@@ -1,0 +1,35 @@
+#!/bin/sh
+set -eu
+
+# Docker forwards embedded-resolver queries from this network namespace when
+# the upstream is external. Allowing 127.0.0.11 alone does not cover that traffic.
+# Docker records the upstreams in its generated resolv.conf ExtServers comment.
+# host(...) entries use the host namespace and need no sidecar exception.
+case "${1:-}" in
+  return|accept) ;;
+  *) exit 2 ;;
+esac
+
+awk -v action="$1" '
+  function emit(ns, family, parts, count, i) {
+    if (ns ~ /^host\(/) return
+    sub(/%.*/, "", ns)
+    if (ns ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/) {
+      count = split(ns, parts, ".")
+      for (i = 1; i <= count; i++) if (parts[i] > 255) return
+      family = "ip"
+    } else if (ns ~ /:/ && ns ~ /^[0-9a-fA-F:.]+$/) {
+      family = "ip6"
+    } else return
+    if (seen[ns]++) return
+    printf "    %s daddr %s udp dport 53 %s\n", family, ns, action
+    printf "    %s daddr %s tcp dport 53 %s\n", family, ns, action
+  }
+  /^nameserver[[:space:]]+/ { emit($2) }
+  /^# ExtServers: \[/ {
+    sub(/^# ExtServers: \[/, "")
+    sub(/\][[:space:]]*$/, "")
+    gsub(/,/, " ")
+    for (i = 1; i <= NF; i++) emit($i)
+  }
+' "${2:-/etc/resolv.conf}"

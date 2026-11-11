@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+/build/
+inputs.nar
+offline-paths.json
+result
+result-*
+.envrc
+.direnv/
+
+.ruff_cache/
+*.egg-info/

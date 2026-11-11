@@ -1,0 +1,65 @@
+{ pkgs }:
+# Build an image description with nix2container. The result is a small JSON
+# file that references store paths; `oci.py load` streams the layers straight
+# from /nix/store into Docker, so no image archive is kept in the store.
+let
+  n2c = import ../pins/nix2container.nix { inherit pkgs; };
+  lib = pkgs.lib;
+in
+{ name
+  # Packages merged into one tree. With `prefix = null` it is placed at the
+  # image root (/bin, /etc, ...). With a prefix such as "/opt/nix-tools" it is
+  # only linked there, leaving a base image's own /bin and /etc untouched.
+, packages ? [ ]
+, prefix ? null
+  # Further derivations whose contents are copied to the image root.
+, root ? [ ]
+  # Directories created in the image: { path; mode ? "0755"; uid ? 0; gid ? 0; }
+, dirs ? [ ]
+, config ? { }
+, fromImage ? null
+  # Exact file/directory permission overrides, applied after the generic defaults.
+, filePerms ? [ ]
+, maxLayers ? 100
+}:
+let
+  tree = pkgs.buildEnv {
+    name = "${baseNameOf name}-packages";
+    paths = packages;
+    ignoreCollisions = true;
+  };
+  # One real directory tree: nix2container rejects a path that is a symlink in
+  # one source (buildEnv links /var whole) and a directory in another.
+  rootfs = pkgs.runCommand "${baseNameOf name}-rootfs" { } (
+    "mkdir -p $out\n"
+    + lib.optionalString (packages != [ ]) (
+      if prefix == null then "cp -rsL ${tree}/. $out/\nchmod -R u+w $out\n"
+      else "mkdir -p \"$out$(dirname ${prefix})\"\nln -s ${tree} \"$out${prefix}\"\n"
+    )
+    + lib.concatMapStrings (source: ''
+      chmod -R u+w $out
+      cp -a --no-preserve=ownership --remove-destination ${source}/. $out/
+    '') root
+    + "chmod -R u+w $out\n"
+    + lib.concatMapStrings (d: "mkdir -p \"$out\"/" + lib.escapeShellArg (lib.removePrefix "/" d.path) + "\n") dirs
+  );
+  escape = lib.escapeRegex;
+in
+n2c.buildImage {
+  name = "nix2rle/${name}";
+  inherit config fromImage maxLayers;
+  created = "1970-01-01T00:00:01Z";
+  copyToRoot = [ rootfs ];
+  # Restore owner write permission stripped by the store, without making data
+  # files executable (symlink modes are ignored). Later entries win, so specific
+  # directories override the default.
+  perms =
+    [{ path = rootfs; regex = "^${escape "${rootfs}"}/.*"; orMode = "0200"; }]
+    ++ map (d: {
+      path = rootfs;
+      regex = "^${escape "${rootfs}"}/${escape (lib.removePrefix "/" d.path)}$";
+      mode = d.mode or "0755";
+      uid = d.uid or 0;
+      gid = d.gid or 0;
+    }) (dirs ++ filePerms);
+}
