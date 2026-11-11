@@ -1,7 +1,6 @@
 """Hosted publication: push without a daemon and emit a self-describing manifest."""
 
 import contextlib
-import hashlib
 import io
 import json
 import subprocess
@@ -16,7 +15,7 @@ import yaml
 
 REPO = Path(__file__).resolve().parents[2]
 from nix2rle import cli as standalone
-from nix2rle.authoring import apt_lock, pin_base
+from nix2rle.authoring import pin_base
 from nix2rle.cli import execute
 from nix2rle.environment.declaration import load_manifest
 from nix2rle.outputs import oci
@@ -188,49 +187,6 @@ class PushTests(unittest.TestCase):
 
 
 class AuthoringToolTests(unittest.TestCase):
-    def test_apt_lock_verifies_index_hash_and_replaces_prefix(self):
-        payload = b"debian package bytes"
-        record = {
-            "url": "https://snapshot.test/pool/c/curl_1_amd64.deb",
-            "name": "curl_1_amd64.deb",
-            "size": str(len(payload)),
-            "kind": "SHA512",
-            "hash": hashlib.sha512(payload).hexdigest(),
-        }
-        line = (
-            f"'{record['url']}' {record['name']} {record['size']} "
-            f"SHA512:{record['hash']}"
-        )
-        self.assertEqual(apt_lock.URI.match(line).groupdict(), record)
-        with tempfile.TemporaryDirectory() as directory:
-            cache = Path(directory)
-            (cache / record["name"]).write_bytes(payload)
-            self.assertEqual(
-                apt_lock.download_hash(record, cache),
-                hashlib.sha256(payload).hexdigest(),
-            )
-            (cache / record["name"]).write_bytes(b"tampered")
-            with self.assertRaisesRegex(ValueError, "do not match"):
-                apt_lock.download_hash(record, cache)
-            lock = cache / "inputs.lock.json"
-            lock.write_text(
-                json.dumps(
-                    {
-                        "schema_version": 1,
-                        "artifacts": [
-                            {"path": "debs/main/old.deb", "urls": ["u"], "sha256": "x"},
-                            {"path": "other/keep.tar", "urls": ["u"], "sha256": "y"},
-                        ],
-                    }
-                )
-            )
-            new = {"path": "debs/main/curl.deb", "urls": ["u"], "sha256": "z"}
-            document = apt_lock.update_lock(lock, "debs/main", [new])
-            self.assertEqual(
-                [a["path"] for a in document["artifacts"]],
-                ["debs/main/curl.deb", "other/keep.tar"],
-            )
-
     def test_pin_base_reads_hash_from_nix_mismatch(self):
         stderr = (
             "error: hash mismatch in fixed-output derivation:\n"

@@ -43,6 +43,14 @@ step. `fetch` evaluates and builds the image and application attributes in the
 usual way; any imports-from-derivation inside an authored recipe retain their
 normal Nix evaluation behavior when those image attributes are evaluated.
 
+`nix2rle ENV declaration` prints the evaluated declaration as JSON, plus the
+Nix-free runtime declaration it generates, without building anything. Tools that
+inspect topology should read it rather than calling `nix-instantiate` directly.
+
+For a separate Python grader, `h.pythonVerifier { tests = ./task/tests; packages = [ ... ]; }`
+returns a container with the tests at `/tests` (`test.sh` executable) on a minimal
+Python userland; declare it under `verifiers.<context>.main.container`.
+
 Run the environment with:
 
 ```sh

@@ -178,6 +178,26 @@ class EnvironmentManifestTests(unittest.TestCase):
                 workspace=Path(self.directory.name) / "work",
             )
 
+    def test_declaration_action_prints_declaration_and_runtime(self):
+        result = subprocess.run(
+            [sys.executable, "-m", "nix2rle", str(self.root), "declaration"],
+            text=True, capture_output=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        document = json.loads(result.stdout)
+        self.assertEqual(document["name"], "synthetic")
+        self.assertIn("main", document["compose"]["services"])
+        self.assertEqual(document["runtime"]["task"], "task")
+        self.assertFalse((self.root.parent / "build").exists())
+
+    def test_harbor_arguments_only_with_run(self):
+        result = subprocess.run(
+            [sys.executable, "-m", "nix2rle", str(self.root), "validate", "--", "--model", "x"],
+            text=True, capture_output=True,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("only accepted by run", result.stderr)
+
     def test_validate_needs_no_build_or_workspace(self):
         result = subprocess.run(
             [sys.executable, "-m", "nix2rle", str(self.root), "validate"],

@@ -160,7 +160,10 @@ def inspect_job(
     return report
 
 
-def run_trial(root: Path, work: Path, harness: Path, agent: str):
+def run_trial(
+    root: Path, work: Path, harness: Path, agent: str, harbor_args: list[str] = ()
+):
+    """One Harbor trial with ``agent``; ``harbor_args`` are passed to `harbor run`."""
     from harbor.models.task.config import TaskConfig
 
     task = TaskConfig.model_validate_toml((work / "runtime/task.toml").read_text())
@@ -192,6 +195,7 @@ def run_trial(root: Path, work: Path, harness: Path, agent: str):
         str(jobs),
         "--job-name",
         name,
+        *harbor_args,
     ]
     launch_error = None
     try:
