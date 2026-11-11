@@ -1,4 +1,4 @@
-"""Generate a Harbor task from a nix2rle source tree and its runtime declaration.
+"""Generate a Harbor task from a mango source tree and its runtime declaration.
 
 Pure Python: no Nix evaluation and no image access. The local runner and the
 hosted execution workers share this step, so a declaration evaluated once on a
@@ -11,7 +11,7 @@ from pathlib import Path
 
 import yaml
 
-from nix2rle.runtime.manifest import RuntimeDeclaration
+from mango.runtime.manifest import RuntimeDeclaration
 
 COMPOSE_NAMES = ("docker-compose.yaml", "docker-compose.yml")
 

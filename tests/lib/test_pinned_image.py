@@ -169,7 +169,7 @@ class CachedPinnedImageTests(unittest.TestCase):
         os.environ.get("RUN_DOCKER_TESTS") == "1", "opt-in Docker runtime test"
     )
     def test_load_and_runtime_preserve_image(self):
-        spec = importlib.util.spec_from_file_location("oci", HARNESS / "src/nix2rle/outputs/oci.py")
+        spec = importlib.util.spec_from_file_location("oci", HARNESS / "src/mango/outputs/oci.py")
         oci = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(oci)
         oci.require_containerd_store()

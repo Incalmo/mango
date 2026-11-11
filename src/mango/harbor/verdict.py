@@ -182,7 +182,7 @@ def run_trial(
         "--path",
         str(work / "runtime"),
         "--environment-import-path",
-        "nix2rle.harbor.environment:PreloadedDockerEnvironment",
+        "mango.harbor.environment:PreloadedDockerEnvironment",
         "--agent",
         agent,
         "--n-concurrent",

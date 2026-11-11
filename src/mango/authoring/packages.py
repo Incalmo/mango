@@ -13,11 +13,11 @@ so a later stage sees exactly what the earlier ones left behind. A stage may
 prefer a suite (apt ``-t``) and add sources of its own.
 
 Resolution needs Docker and the network, so results are cached outside any
-environment, keyed by the request's content: ``NIX2RLE_LOCK_CACHE`` (default
-``~/.cache/nix2rle/locks``). ``NIX2RLE_LOCK_OFFLINE=1`` turns a cache miss into
+environment, keyed by the request's content: ``MANGO_LOCK_CACHE`` (default
+``~/.cache/mango/locks``). ``MANGO_LOCK_OFFLINE=1`` turns a cache miss into
 an error. Tests install a resolver with :func:`use_resolver`.
 
-    nix2rle-lock-packages --lock inputs.lock.json --manager apt \\
+    mango-lock-packages --lock inputs.lock.json --manager apt \\
         --base docker.io/library/ubuntu@sha256:<digest> \\
         --source 'deb https://snapshot.ubuntu.com/ubuntu/20261001T000000Z noble main universe' \\
         --stage 'ca-certificates python3' --stage 'build-essential'
@@ -45,10 +45,10 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-CACHE_ENV = "NIX2RLE_LOCK_CACHE"
-OFFLINE_ENV = "NIX2RLE_LOCK_OFFLINE"
-CA_BUNDLE = "/etc/nix2rle-lock-ca.crt"
-STAGE_MARKER = "@@nix2rle-stage "
+CACHE_ENV = "MANGO_LOCK_CACHE"
+OFFLINE_ENV = "MANGO_LOCK_OFFLINE"
+CA_BUNDLE = "/etc/mango-lock-ca.crt"
+STAGE_MARKER = "@@mango-stage "
 APT_URI = re.compile(
     r"^'(?P<url>[^']+)' (?P<name>\S+) (?P<size>\d+) (?P<kind>[A-Za-z0-9]+):(?P<hash>[0-9a-f]+)$"
 )
@@ -122,7 +122,7 @@ def use_resolver(resolver: Resolver) -> Iterator[None]:
 
 def cache_dir() -> Path:
     configured = os.environ.get(CACHE_ENV)
-    return Path(configured) if configured else Path.home() / ".cache" / "nix2rle" / "locks"
+    return Path(configured) if configured else Path.home() / ".cache" / "mango" / "locks"
 
 
 def _cache_path(request: LockRequest) -> Path:
@@ -265,7 +265,7 @@ def apt_script(request: LockRequest) -> str:
         "export DEBIAN_FRONTEND=noninteractive",
         "rm -f /etc/apt/sources.list /etc/apt/sources.list.d/*",
         "printf '%s\\n' " + " ".join(shlex.quote(s) for s in request.sources)
-        + " > /etc/apt/sources.list.d/nix2rle-lock.list",
+        + " > /etc/apt/sources.list.d/mango-lock.list",
         f"apt-get -qq {options} update >&2",
     ]
     last = len(request.stages) - 1
@@ -273,7 +273,7 @@ def apt_script(request: LockRequest) -> str:
         if stage.extra_sources:
             lines += [
                 "printf '%s\\n' " + " ".join(shlex.quote(s) for s in stage.extra_sources)
-                + " >> /etc/apt/sources.list.d/nix2rle-lock.list",
+                + " >> /etc/apt/sources.list.d/mango-lock.list",
                 f"apt-get -qq {options} update >&2",
             ]
         target = f"-t {shlex.quote(stage.target_release)} " if stage.target_release else ""
@@ -296,7 +296,7 @@ def opkg_script(request: LockRequest) -> str:
 
 def _resolve_apt(request: LockRequest) -> list[list[LockedFile]]:
     stages = _split_stages(_run_in_base(request, apt_script(request)), len(request.stages), APT_URI)
-    with tempfile.TemporaryDirectory(prefix="nix2rle-apt-lock-") as scratch:
+    with tempfile.TemporaryDirectory(prefix="mango-apt-lock-") as scratch:
         return [
             [
                 LockedFile(name=r["name"], url=r["url"], sha256=download_hash(r, Path(scratch)))
@@ -339,7 +339,7 @@ def lock_request(request: LockRequest, lock: Path) -> list[str]:
 
 def main():
     parser = argparse.ArgumentParser(
-        prog="nix2rle-lock-packages", description=__doc__.split("\n")[0]
+        prog="mango-lock-packages", description=__doc__.split("\n")[0]
     )
     parser.add_argument("--lock", type=Path, required=True, help="inputs.lock.json to update")
     parser.add_argument("--manager", choices=["apt", "opkg"], default="apt")

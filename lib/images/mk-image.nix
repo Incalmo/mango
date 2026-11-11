@@ -46,7 +46,7 @@ let
   escape = lib.escapeRegex;
 in
 n2c.buildImage {
-  name = "nix2rle/${name}";
+  name = "mango/${name}";
   inherit config fromImage maxLayers;
   created = "1970-01-01T00:00:01Z";
   copyToRoot = [ rootfs ];

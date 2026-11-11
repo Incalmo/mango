@@ -12,7 +12,7 @@ import yaml
 from harbor.environments.docker.docker import DockerEnvironment
 from harbor.models.trial.config import ResourceMode
 
-from nix2rle.runtime.materialize import ImageOnlyDockerMixin
+from mango.runtime.materialize import ImageOnlyDockerMixin
 
 #: Memory ceiling for each service of a locally run environment. Hosted workers
 #: cap a whole trial at about 12.8 GiB, so no service can use more than this

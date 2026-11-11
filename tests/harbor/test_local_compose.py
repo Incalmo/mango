@@ -11,11 +11,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 REPO = Path(__file__).resolve().parents[2]
-from nix2rle.cli import build_digest, execute
-from nix2rle.environment.declaration import load_manifest
-from nix2rle.harbor.compose import verify_local_images
-from nix2rle.runtime.manifest import BuildManifest
-from nix2rle.runtime.materialize import SIDECAR_SERVICE
+from mango.cli import build_digest, execute
+from mango.environment.declaration import load_manifest
+from mango.harbor.compose import verify_local_images
+from mango.runtime.manifest import BuildManifest
+from mango.runtime.materialize import SIDECAR_SERVICE
 from tests.support import write_recipe
 
 
@@ -75,7 +75,7 @@ class LocalComposeTests(unittest.TestCase):
 
     def compose(self):
         with (
-            patch("nix2rle.cli.instantiate", return_value=self.drvs),
+            patch("mango.cli.instantiate", return_value=self.drvs),
             contextlib.redirect_stdout(io.StringIO()) as output,
         ):
             execute(
@@ -107,7 +107,7 @@ class LocalComposeTests(unittest.TestCase):
 
     def test_missing_local_image_does_not_pull(self):
         with patch(
-            "nix2rle.harbor.compose.subprocess.run",
+            "mango.harbor.compose.subprocess.run",
             return_value=subprocess.CompletedProcess([], 1),
         ) as run:
             with self.assertRaisesRegex(ValueError, "Preloaded image missing"):
@@ -116,13 +116,13 @@ class LocalComposeTests(unittest.TestCase):
 
     def test_invalid_volume_reports_compose_error_without_publishing(self):
         self.write_recipe(volume="missing:/data")
-        with patch("nix2rle.harbor.compose.verify_local_images"):
+        with patch("mango.harbor.compose.verify_local_images"):
             with self.assertRaisesRegex(ValueError, "undefined volume missing"):
                 self.compose()
         self.assertFalse((self.work / "compose").exists())
 
     def test_real_compose_preserves_topology_assets_and_separate_grader(self):
-        with patch("nix2rle.harbor.compose.verify_local_images"):
+        with patch("mango.harbor.compose.verify_local_images"):
             report = self.compose()
         self.assertEqual(len(report["graders"]), 1)
         self.assertIn("oracle", report["grading"])

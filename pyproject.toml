@@ -1,5 +1,5 @@
 [project]
-name = "nix2rle"
+name = "mango"
 version = "0.1.0"
 description = "Declare reproducible learning environments in Nix and run them as Harbor tasks"
 license = "MIT"
@@ -10,9 +10,9 @@ dependencies = ["pydantic", "pyyaml", "zstandard"]
 harbor = ["harbor==0.23.0"]
 
 [project.scripts]
-nix2rle = "nix2rle.cli:main"
-nix2rle-pin-base = "nix2rle.authoring.pin_base:main"
-nix2rle-lock-packages = "nix2rle.authoring.packages:main"
+mango = "mango.cli:main"
+mango-pin-base = "mango.authoring.pin_base:main"
+mango-lock-packages = "mango.authoring.packages:main"
 
 [build-system]
 requires = ["setuptools>=69"]

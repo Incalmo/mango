@@ -5,8 +5,8 @@ linux/amd64 manifest digest, then fetches that digest with the harness's own
 ``fetchLinuxBase`` to learn the Nix content hash. Commit the printed
 ``{ image; digest; hash; }``; builds never resolve tags.
 
-    nix2rle-pin-base docker.io/library/ubuntu:22.04
-    nix2rle-pin-base docker.io/library/ubuntu@sha256:<digest> --nix
+    mango-pin-base docker.io/library/ubuntu:22.04
+    mango-pin-base docker.io/library/ubuntu@sha256:<digest> --nix
 """
 
 import argparse
@@ -14,7 +14,7 @@ import json
 import re
 import subprocess
 
-from nix2rle import HARNESS
+from mango import HARNESS
 
 GOT = re.compile(r"got:\s+(sha256-[A-Za-z0-9+/=]+)")
 
@@ -87,7 +87,7 @@ def nix(value: dict) -> str:
 
 
 def main():
-    parser = argparse.ArgumentParser(prog="nix2rle-pin-base", description=__doc__.split("\n")[0])
+    parser = argparse.ArgumentParser(prog="mango-pin-base", description=__doc__.split("\n")[0])
     parser.add_argument("reference", nargs="+", help="image:tag or image@sha256:...")
     parser.add_argument("--nix", action="store_true", help="print Nix attribute sets")
     args = parser.parse_args()

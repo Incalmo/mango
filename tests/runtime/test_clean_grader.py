@@ -8,8 +8,8 @@ import yaml
 from harbor.environments.definition import require_agent_environment_definition
 
 REPO = Path(__file__).resolve().parents[2]
-from nix2rle.runtime.manifest import BuildManifest, RuntimeDeclaration
-from nix2rle.runtime.materialize import materialize_runtime, verifier_environments
+from mango.runtime.manifest import BuildManifest, RuntimeDeclaration
+from mango.runtime.materialize import materialize_runtime, verifier_environments
 
 
 class CleanGraderTests(unittest.TestCase):

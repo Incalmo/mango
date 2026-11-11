@@ -1,4 +1,4 @@
-nix2rle: reproducible learning environment build harness
+mango: reproducible learning environment build harness
 
 Original harness code is provided under the MIT license in LICENSE.
 

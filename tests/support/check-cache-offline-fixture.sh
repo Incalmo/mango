@@ -18,7 +18,7 @@ in builtins.derivation {
 NIX
 drv=$(nix-instantiate "$work/fixture.nix")
 nix-store --realise "$drv" > /dev/null
-PYTHONPATH="$repo/src" python -m nix2rle.outputs.offline freeze "$work/bundle/build/fixture/inputs.json" "$drv"
+PYTHONPATH="$repo/src" python -m mango.outputs.offline freeze "$work/bundle/build/fixture/inputs.json" "$drv"
 nix-store --generate-binary-cache-key fixture "$work/key" "$work/key.pub"
 python - "$work" <<'PY'
 import json, pathlib, subprocess, sys

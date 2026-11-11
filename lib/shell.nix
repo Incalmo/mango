@@ -1,4 +1,4 @@
-# Pinned tooling for running nix2rle: Python with the harness package on its
+# Pinned tooling for running mango: Python with the harness package on its
 # path, Harbor, skopeo and the commands below.
 let
   pkgs = import (import ./pins/nixpkgs.nix) { system = "x86_64-linux"; config = {}; overlays = []; };
@@ -16,9 +16,9 @@ in pkgs.mkShell {
     n2c.skopeo
     pkgs.ruff
     pkgs.util-linux
-    (command "nix2rle" "nix2rle")
-    (command "nix2rle-pin-base" "nix2rle.authoring.pin_base")
-    (command "nix2rle-lock-packages" "nix2rle.authoring.packages")
+    (command "mango" "mango")
+    (command "mango-pin-base" "mango.authoring.pin_base")
+    (command "mango-lock-packages" "mango.authoring.packages")
   ];
   shellHook = ''
     export PYTHONPATH=${source}''${PYTHONPATH:+:$PYTHONPATH}

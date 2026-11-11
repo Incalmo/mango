@@ -74,7 +74,7 @@ must invoke `runHook preBuild`. The check is defense in depth: actual enforcemen
 is Nix `sandbox=true`, `sandbox-fallback=false`; it is not a replacement for those
 settings. Pin package-manager/toolchain versions and platform in the recipe.
 
-The existing `nix2rle /path/to/environment check` rebuilds rather than accepting existing
+The existing `mango /path/to/environment check` rebuilds rather than accepting existing
 application outputs, disables substitution and remote builders, and checks output
 identity. `tests/support/check-isolated-store.sh` provides the stronger proof:
 restore to an empty store, remove final outputs there, then rebuild under an outer

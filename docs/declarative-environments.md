@@ -43,7 +43,7 @@ step. `fetch` evaluates and builds the image and application attributes in the
 usual way; any imports-from-derivation inside an authored recipe retain their
 normal Nix evaluation behavior when those image attributes are evaluated.
 
-`nix2rle ENV declaration` prints the evaluated declaration as JSON, plus the
+`mango ENV declaration` prints the evaluated declaration as JSON, plus the
 Nix-free runtime declaration it generates, without building anything. Tools that
 inspect topology should read it rather than calling `nix-instantiate` directly.
 
@@ -54,12 +54,12 @@ Python userland; declare it under `verifiers.<context>.main.container`.
 Run the environment with:
 
 ```sh
-nix-shell --run 'nix2rle /path/to/environment validate'
-nix-shell --run 'nix2rle /path/to/environment fetch'
-nix-shell --run 'nix2rle /path/to/environment check'
-nix-shell --run 'nix2rle /path/to/environment load'
-nix-shell --run 'nix2rle /path/to/environment compose'
-nix-shell --run 'nix2rle /path/to/environment run --agent oracle'
+nix-shell --run 'mango /path/to/environment validate'
+nix-shell --run 'mango /path/to/environment fetch'
+nix-shell --run 'mango /path/to/environment check'
+nix-shell --run 'mango /path/to/environment load'
+nix-shell --run 'mango /path/to/environment compose'
+nix-shell --run 'mango /path/to/environment run --agent oracle'
 ```
 
 Only generated workspace copies receive Compose files. Source task assets remain

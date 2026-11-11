@@ -6,7 +6,7 @@ and runs many trials from the result. The split keeps Nix on builders only:
 1. **Builder.** With the source snapshot extracted at `ENV`:
 
    ```sh
-   nix-shell "$HARNESS/shell.nix" --run "nix2rle '$ENV' \
+   nix-shell "$HARNESS/shell.nix" --run "mango '$ENV' \
      --workspace '$WORK' publish --repository '$REPO/$BUILD' \
      --build-id '$BUILD' --source-digest '$DIGEST' --output manifest.json"
    ```
@@ -46,8 +46,8 @@ and runs many trials from the result. The split keeps Nix on builders only:
    Python and Docker:
 
    ```python
-   from nix2rle.runtime.task import generate_task
-   from nix2rle.runtime.materialize import materialize_runtime
+   from mango.runtime.task import generate_task
+   from mango.runtime.materialize import materialize_runtime
 
    generate_task(source, manifest.runtime, task)   # copy task/, write Compose
    materialize_runtime(task, manifest, digest)       # bind digest images
@@ -56,7 +56,7 @@ and runs many trials from the result. The split keeps Nix on builders only:
    The generated `task` is an ordinary image-only Harbor task. Use the
    prebuilt-image environment adapter so Harbor pulls instead of building.
 
-`src/nix2rle/runtime/` (`task.py`, `materialize.py`, `manifest.py`) has no Nix
+`src/mango/runtime/` (`task.py`, `materialize.py`, `manifest.py`) has no Nix
 or Harbor dependency: a hosted worker installs or vendors only that package.
 Keep vendored copies byte-compatible apart from their import lines.
 

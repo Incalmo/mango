@@ -8,7 +8,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-#: Version 3: images come from a nix2rle declaration and the manifest carries
+#: Version 3: images come from a mango declaration and the manifest carries
 #: the runtime declaration that turns the source tree into a Harbor task.
 BUILD_RECIPE_VERSION = 3
 RUNTIME_SCHEMA_VERSION = 1

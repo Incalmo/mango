@@ -29,11 +29,11 @@ download receipt, and the rules from the registry's packaging specification. Do 
 signed download URLs or credentials in source descriptors. Keep provenance and
 harness/recipe revisions in the separate qualification records.
 
-From the harness checkout, materialize before running `nix2rle validate`:
+From the harness checkout, materialize before running `mango validate`:
 
 ```sh
-nix-shell --run 'python -m nix2rle.authoring.task_source materialize --archive "$ARCHIVE" --descriptor "$ENVIRONMENT/task-source.json" --out "$ENVIRONMENT/task"'
-nix-shell --run 'python -m nix2rle.authoring.task_source verify --descriptor "$ENVIRONMENT/task-source.json" --task "$ENVIRONMENT/task"'
+nix-shell --run 'python -m mango.authoring.task_source materialize --archive "$ARCHIVE" --descriptor "$ENVIRONMENT/task-source.json" --out "$ENVIRONMENT/task"'
+nix-shell --run 'python -m mango.authoring.task_source verify --descriptor "$ENVIRONMENT/task-source.json" --task "$ENVIRONMENT/task"'
 ```
 
 The first command snapshots and hashes the supplied archive, extracts into a
@@ -85,7 +85,7 @@ explicitly pin reusable installers separately as normal Nix inputs, without
 changing the immutable original task archive or scanning it for dependencies.
 
 A customer bundle must include the original archive plus descriptor, or the
-materialized task tree. The current `nix2rle export` copies a materialized task;
+materialized task tree. The current `mango export` copies a materialized task;
 materialize it first. A bare descriptor is not a distributable environment.
 Allow disk space for the original archive, temporary archive snapshot and
 extracted tree during materialization. Qualification must still compare the

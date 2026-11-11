@@ -128,7 +128,7 @@ nix-shell --run 'RUN_LINUX_VM_TESTS=1 python -m unittest discover -s tests -t . 
 
 The test uses uniquely named local images and removes its own tag afterward.
 
-When `nix2rle load` serializes a nix2container image, it restores the complete
+When `mango load` serializes a nix2container image, it restores the complete
 declared runtime configuration after transport conversion, including Docker
 health checks and stop signals. It recomputes the OCI config and manifest
 digests and sizes, leaving serialized architecture, OS, ordered layers,

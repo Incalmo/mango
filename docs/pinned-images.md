@@ -17,7 +17,7 @@ Linux/amd64 platform restriction and pin validation apply. Tags are never resolv
 the remote reference includes the supplied digest.
 
 The result is an OCI-layout directory usable directly in `mkEnvironment.containers`
-and by `nix2rle fetch` / `load`. It also exposes `.base`, the original fixed-output
+and by `mango fetch` / `load`. It also exposes `.base`, the original fixed-output
 `fetchLinuxBase` directory. No VM, build command, empty layer or image configuration
 normalization is involved.
 

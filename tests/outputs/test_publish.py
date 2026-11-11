@@ -14,14 +14,14 @@ from unittest.mock import patch
 import yaml
 
 REPO = Path(__file__).resolve().parents[2]
-from nix2rle import cli as standalone
-from nix2rle.authoring import pin_base
-from nix2rle.cli import execute
-from nix2rle.environment.declaration import load_manifest
-from nix2rle.outputs import oci
-from nix2rle.runtime.manifest import BuildManifest
-from nix2rle.runtime.materialize import materialize_runtime
-from nix2rle.runtime.task import generate_task
+from mango import cli as standalone
+from mango.authoring import pin_base
+from mango.cli import execute
+from mango.environment.declaration import load_manifest
+from mango.outputs import oci
+from mango.runtime.manifest import BuildManifest
+from mango.runtime.materialize import materialize_runtime
+from mango.runtime.task import generate_task
 from tests.support import separate_grader_toml, write_recipe
 
 DIGEST = "sha256:" + "a" * 64
@@ -67,10 +67,10 @@ class PublishTests(unittest.TestCase):
             setattr(args, key, value)
         self.work.mkdir(exist_ok=True)
         with (
-            patch("nix2rle.cli.instantiate", return_value=drvs),
-            patch("nix2rle.cli.subprocess.run"),
-            patch("nix2rle.cli.realise_derivations"),
-            patch("nix2rle.cli.push", side_effect=push),
+            patch("mango.cli.instantiate", return_value=drvs),
+            patch("mango.cli.subprocess.run"),
+            patch("mango.cli.realise_derivations"),
+            patch("mango.cli.push", side_effect=push),
             contextlib.redirect_stdout(io.StringIO()) as output,
         ):
             execute(args, self.root, self.app, self.work, self.app.verifiers)
@@ -120,7 +120,7 @@ class FailureClassificationTests(unittest.TestCase):
             return real([sys.executable, "-c", script], **kwargs)
 
         with (
-            patch("nix2rle.cli.subprocess.Popen", side_effect=popen),
+            patch("mango.cli.subprocess.Popen", side_effect=popen),
             contextlib.redirect_stderr(io.StringIO()),
         ):
             standalone.realise_derivations(["/nix/store/x.drv"], Path("/"))
@@ -141,7 +141,7 @@ class FailureClassificationTests(unittest.TestCase):
             (root / "task/task.toml").write_text("[environment]\n")
             (root / "default.nix").write_text('{ harness }: throw "broken"')
             result = subprocess.run(
-                [sys.executable, "-m", "nix2rle", str(root), "validate"],
+                [sys.executable, "-m", "mango", str(root), "validate"],
                 capture_output=True,
                 text=True,
             )
@@ -167,7 +167,7 @@ class PushTests(unittest.TestCase):
                 Path(command[command.index("--digestfile") + 1]).write_text(DIGEST)
                 return subprocess.CompletedProcess(command, 0)
 
-            with patch("nix2rle.outputs.oci.subprocess.run", side_effect=skopeo):
+            with patch("mango.outputs.oci.subprocess.run", side_effect=skopeo):
                 reference = oci.push_one("main", layout, "registry.test/r/")
             self.assertEqual(reference, f"registry.test/r/main@{DIGEST}")
             (command,) = calls
@@ -181,7 +181,7 @@ class PushTests(unittest.TestCase):
                 )
                 return subprocess.CompletedProcess(command, 0)
 
-            with patch("nix2rle.outputs.oci.subprocess.run", side_effect=wrong):
+            with patch("mango.outputs.oci.subprocess.run", side_effect=wrong):
                 with self.assertRaisesRegex(RuntimeError, "differs"):
                     oci.push_one("main", layout, "registry.test/r")
 
@@ -194,7 +194,7 @@ class AuthoringToolTests(unittest.TestCase):
             "            got:    sha256-VJrEWNzP7YSUs7FXJ6UIbPd7YlPrIGXCxJ2UAbL9iCc=\n"
         )
         with patch(
-            "nix2rle.authoring.pin_base.subprocess.run",
+            "mango.authoring.pin_base.subprocess.run",
             return_value=subprocess.CompletedProcess([], 1, "", stderr),
         ):
             value = pin_base.pin("alpine@" + DIGEST)
