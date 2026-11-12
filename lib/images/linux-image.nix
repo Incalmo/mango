@@ -2,18 +2,22 @@
 let
   lib = pkgs.lib;
   python = pkgs.python313;
-  runner = "${builtins.path {
+  builders = builtins.path {
     path = ../../builders;
     name = "linux-image-runner";
-    filter = path: type: builtins.elem (baseNameOf path) [ "builders" "rootfs.py" "artifacts.py" ];
-  }}/rootfs.py";
+    filter = path: type: builtins.elem (baseNameOf path) [ "builders" "rootfs.py" "artifacts.py" "materialize.py" ];
+  };
+  runner = "${builders}/rootfs.py";
 in {
-  fetchLinuxBase = { image, digest, hash, name ? "linux-base" }:
+  fetchLinuxBase = { image, digest, hash, name ? "linux-base", mirrors ? [] }:
     assert lib.assertMsg (pkgs.stdenv.hostPlatform.system == "x86_64-linux")
       "fetchLinuxBase currently supports x86_64-linux only";
     assert lib.assertMsg (builtins.match "sha256:[0-9a-f]{64}" digest != null)
       "Linux base images require an immutable SHA-256 digest";
     assert lib.assertMsg (hash != "") "Linux base images require a content hash";
+    assert lib.assertMsg (builtins.isList mirrors && builtins.all
+      (mirror: builtins.isString mirror && builtins.match "[A-Za-z0-9._/-]+" mirror != null) mirrors)
+      "Linux base mirrors must be image repository names without tags or digests";
     pkgs.runCommand name {
       nativeBuildInputs = [ pkgs.skopeo pkgs.cacert ];
       impureEnvVars = lib.fetchers.proxyImpureEnvVars;
@@ -21,10 +25,24 @@ in {
       outputHash = hash;
       outputHashAlgo = null;
       preferLocalBuild = false;
-    } ''
+    } (if mirrors == [] then ''
       skopeo --insecure-policy copy --retry-times 3 --override-os linux --override-arch amd64 \
         ${lib.escapeShellArg "docker://${image}@${digest}"} dir:$out
-    '';
+    '' else ''
+      # Every route names the same manifest digest; Nix verifies the same NAR
+      # hash regardless of which registry serves the bytes. Never reuse a
+      # failed copy's partial directory for the next route.
+      for source in ${lib.escapeShellArgs (map (repository: "docker://${repository}@${digest}") (mirrors ++ [ image ]))}; do
+        rm -rf -- "$out"
+        if skopeo --insecure-policy copy --retry-times 3 --override-os linux --override-arch amd64 \
+          "$source" "dir:$out"; then
+          exit 0
+        fi
+      done
+      rm -rf -- "$out"
+      echo "All pinned Linux base registry routes failed" >&2
+      exit 1
+    '');
 
   # The author supplies shell commands and input files. No Dockerfile or package
   # metadata is discovered or interpreted. The original distro's /bin/sh and
@@ -35,7 +53,7 @@ in {
   # `auto-allocate-uids`; no VM and no KVM). Both run the same rootfs.py build
   # and produce the same layer.
   mkLinuxImage = { name, base, inputs ? pkgs.emptyDirectory, context ? pkgs.emptyDirectory
-    , buildScript, buildEnv ? {}, config ? {}, diskSize ? 16384, memSize ? 4096
+    , buildScript ? null, buildSteps ? null, buildEnv ? {}, config ? {}, diskSize ? 16384, memSize ? 4096
     , sourceDateEpoch ? 1, exportPaths ? [], cores ? 1, isolation ? "vm" }:
     assert lib.assertMsg (pkgs.stdenv.hostPlatform.system == "x86_64-linux")
       "mkLinuxImage currently supports x86_64-linux only";
@@ -45,20 +63,31 @@ in {
       "mkLinuxImage cores must be an integer from 1 to 255";
     assert lib.assertMsg (builtins.elem isolation [ "vm" "namespace" ])
       "mkLinuxImage isolation must be \"vm\" or \"namespace\"";
+    assert lib.assertMsg ((buildScript != null) != (buildSteps != null))
+      "mkLinuxImage requires exactly one of buildScript or buildSteps";
+    assert lib.assertMsg (buildSteps == null || (builtins.isList buildSteps && builtins.all
+      (step: builtins.isAttrs step && builtins.isString (step.command or null)) buildSteps))
+      "mkLinuxImage buildSteps must contain command strings";
     let
       # Stable component names let script-only edits reuse large byte inventories.
-      materialize = source: pkgs.runCommand "linux-build-inputs" {} ''
-        cp -rL ${source} $out
+      materialize = mode: source: pkgs.runCommand "linux-build-${mode}" {} ''
+        ${python}/bin/python ${builders}/materialize.py ${mode} ${source} $out
       '';
       staged = pkgs.linkFarm "${name}-build-inputs" [
-        { name = "files"; path = materialize inputs; }
-        { name = "context"; path = materialize context; }
-        { name = "build.sh"; path = pkgs.writeText "build.sh" buildScript; }
+        { name = "files"; path = materialize "inputs" inputs; }
+        { name = "context"; path = materialize "context" context; }
+        { name = "build.sh"; path = pkgs.writeText "build.sh" (if buildScript == null then "" else buildScript); }
       ];
       plan = pkgs.writeText "${name}-build-plan.json" (builtins.toJSON {
         requireOffline = true;
         inherit buildEnv sourceDateEpoch exportPaths;
-        steps = [{ op = "RUN"; cmd = "/bin/sh /.nix-inputs/build.sh"; }];
+        steps = if buildSteps == null then [{ op = "RUN"; cmd = "/bin/sh /.nix-inputs/build.sh"; }]
+          else map (step: {
+            op = "RUN";
+            cmd = step.command;
+            env = step.env or {};
+            mounts = step.mounts or [];
+          } // lib.optionalAttrs (step ? workdir) { inherit (step) workdir; }) buildSteps;
       });
       vm = pkgs.vmTools.runInLinuxVM (pkgs.runCommand "${name}-layer" {
         # vmTools otherwise appends a host/NIX_BUILD_CORES-derived -smp.

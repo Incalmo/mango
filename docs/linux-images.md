@@ -11,6 +11,13 @@ An author can use `pkgs.lib.fakeHash` once to obtain the expected hash, review i
 then commit the real hash. Retain the resulting store object in the binary cache.
 Do not resolve tags during a customer rebuild.
 
+Optional `mirrors = [ "mirror.gcr.io/library/python" ];` supplies alternate
+repository names, without tags or digests. The fetcher tries these in order,
+then `image`, always with the same `digest` and expected `hash`. Failed copies
+are removed before the next attempt. The default empty list retains the direct
+fetch behavior. Authors must verify that each mirror serves the pinned manifest;
+mirrors never authorize a newer tag or different image content.
+
 For parallel hash discovery, pass a unique `name`, for example
 `name = "probe-ubuntu-${builtins.substring 7 12 digest}"`. Otherwise different
 fake-hash fetches share the default `linux-base` output path and serialize on
@@ -20,6 +27,11 @@ path. Naming does not change the fetched bytes or their recursive hash.
 `mkLinuxImage` takes these explicit arguments:
 
 Input files and context are materialized as separate immutable store objects.
+Context symlinks are preserved. For inputs, structural directories in a link farm
+are traversed until an absolute Nix-store reference is found. That referenced
+file or directory is copied once, preserving its nested symlinks. Runtime links
+such as `/bin/sh` are never followed on the builder. A dependency cache that is
+itself a farm should be materialized explicitly before passing it as one payload.
 Changing only `buildScript` reuses those objects rather than copying the entire
 download inventory into a new cache object. During the VM build, the script,
 files and context are mounted individually read-only under `/.nix-inputs`;
@@ -34,6 +46,7 @@ once when adopting the helper, so rerun the affected qualification checks.
 | `inputs` | Store directory, usually from `dependencies.fetchLockedInputs` |
 | `context` | Explicitly selected source/configuration directory |
 | `buildScript` | Shell script authored for this distro |
+| `buildSteps` | Alternative ordered commands with per-command `env`, `workdir`, and temporary `mounts`; specify exactly one of `buildScript` and `buildSteps` |
 | `buildEnv` | Build-only environment variables; defaults to an empty set |
 | `config` | Runtime OCI configuration overrides; defaults to an empty set |
 | `cores` | Explicit VM CPU count, integer 1–255; default 1. Never inferred from the host |
@@ -45,6 +58,31 @@ once when adopting the helper, so rerun the affected qualification checks.
 The script runs as root using the base's `/bin/sh` in a QEMU Linux VM with no
 network device. Loopback is enabled for local service tests; a guard rejects a
 VM that has any other interface.
+
+For temporary source mounts, use ordered steps. Mount paths are absolute paths
+inside the build root, including staged inputs under `/.nix-inputs`. The kernel
+enforces read-only writes through each target; the source retains its original
+permissions. Existing target contents reappear after the command, including on
+failure. Missing target placeholders are removed. Mounts cannot overlap their
+sources, escape the build root through symlinks, or cover runtime/input mounts.
+
+```nix
+buildSteps = [
+  { command = "mkdir -p /work; cp -R /.nix-inputs/context/. /work/"; }
+  {
+    command = "./verify-source /observed";
+    workdir = "/work";
+    mounts = [{ source = "/work"; target = "/observed"; readOnly = true; }];
+  }
+];
+```
+
+Each command starts a fresh shell; persist files or pass explicit `env` values
+between steps. This API does not provide network access or dependency discovery.
+Set `readOnly = false` explicitly for a writable cache mount. Writes then persist
+in its source directory across commands, while the covered target is restored.
+Remove temporary cache source directories in a final step to exclude them from
+the resulting image.
 
 ## Without KVM: `isolation = "namespace"`
 
