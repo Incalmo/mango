@@ -14,6 +14,20 @@ with `fetchLinuxBase` to learn the Nix content hash. The printed
 `{ image; digest; hash; }` is accepted by `fetchLinuxBase`, `pinnedImage` and
 `mkContainer`'s `base`. An already pinned `image@sha256:...` keeps its digest.
 
+## Pin a Git source
+
+```sh
+nix-shell --run 'mango-pin-source https://github.com/owner/app.git --rev v1.2.3'
+```
+
+Resolves a branch, tag or `HEAD` (the default) to its full commit, then fetches
+that commit with the harness's own `pkgs.fetchgit` to learn the Nix content
+hash. The printed `{ repository; commit; hash; }` (JSON, or Nix with `--nix`)
+is what `pkgs.fetchgit { url = repository; rev = commit; inherit hash; }` checks,
+with `fetchgit`'s defaults, submodules included. A full commit is not resolved
+again. Do not hash a checkout with `nix hash path`: it includes `.git` and
+skips submodules, so the build rejects it.
+
 ## Lock distro packages
 
 ```sh
