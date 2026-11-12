@@ -23,6 +23,7 @@ in pkgs.mkShell {
     (command "mango-pin-file" "mango.authoring.pin_file")
     (command "mango-lock-packages" "mango.authoring.packages")
     (command "mango-lock-python" "mango.authoring.python_lock")
+    (command "mango-lock-rustup" "mango.authoring.rustup_lock")
   ];
   shellHook = ''
     export PYTHONPATH=${source}''${PYTHONPATH:+:$PYTHONPATH}

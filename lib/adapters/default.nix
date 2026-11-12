@@ -57,6 +57,7 @@ let
     in builtins.deepSeq records (pkgs.linkFarm name (downloads ++ generated));
 in {
   inherit fetchDependency fetchMavenDependency fetchDependencyCache;
+  fetchRustupToolchain = import ./rustup.nix { inherit pkgs; };
   # Explicitly selected native-lock reader: Cargo registry checksums are reused.
   # Git entries need supplemental NAR hashes; never fetch unhashed Git in eval.
   fetchCargoCache = { lockFile, outputHashes ? {}, extraRegistries ? {} }:
