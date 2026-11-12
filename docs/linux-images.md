@@ -54,6 +54,7 @@ once when adopting the helper, so rerun the affected qualification checks.
 | `exportPaths` | Absolute paths to export as a separate `.artifacts` tar; defaults to `[]` |
 | `sourceDateEpoch` | Timestamp for new layer entries and build `SOURCE_DATE_EPOCH`; defaults to 1 |
 | `isolation` | `"vm"` (default): a QEMU VM. `"namespace"`: the Nix sandbox itself, no VM; see below |
+| `acceleration` | VM accelerator: `"auto"` (default) tries KVM then TCG; `"kvm"` requires hardware acceleration; `"tcg"` forces software emulation |
 
 The script runs as root using the base's `/bin/sh` in a QEMU Linux VM with no
 network device. Loopback is enabled for local service tests; a guard rejects a
@@ -84,10 +85,33 @@ in its source directory across commands, while the covered target is restored.
 Remove temporary cache source directories in a final step to exclude them from
 the resulting image.
 
-## Without KVM: `isolation = "namespace"`
+## Automatic VM acceleration
 
-A VM build needs the `kvm` system feature for practical speed (on a cloud VM,
-nested virtualization). With `isolation = "namespace"` the same build runs in
+The default VM build uses QEMU's `accel=kvm:tcg`. QEMU attempts to initialize
+KVM inside the actual Nix build sandbox and uses software emulation (TCG) if
+that fails. This handles missing devices, permission restrictions and cloud
+machines without nested virtualization. The check runs on the builder, which
+may be different from the machine invoking Mango. No Nix daemon reconfiguration
+or `uid-range` feature is required for the VM path.
+
+Automatic and software-only derivations do not require Nix's `kvm` system
+feature. Software emulation is substantially slower, especially for compilation.
+Use `acceleration = "tcg"` to test that path on a machine with KVM, or
+`acceleration = "kvm"` to require a hardware-accelerated builder. The choice is
+an explicit build input when forced; auto mode does not depend on host detection
+during Nix evaluation. A guest build failure is never retried in another mode.
+
+The real-VM regression test builds the same layer in automatic and forced TCG
+mode and compares the bytes. It also masks KVM in a private user/mount namespace
+to verify automatic fallback without changing the host:
+
+```sh
+nix-shell --run 'RUN_LINUX_VM_TESTS=1 python -m unittest tests.lib.test_vm_acceleration -v'
+```
+
+## Optional namespace builds: `isolation = "namespace"`
+
+With `isolation = "namespace"` the same build runs in
 the Nix sandbox instead: root inside a user namespace mapped over 65536 uids,
 so installers can create service users and `chown` to them, in the sandbox's
 private network namespace with only loopback. It runs the same `rootfs.py`

@@ -15,10 +15,46 @@ cloud infrastructure.
 Linux x86_64, Nix with sandboxing enabled, and the `nix-command` and `flakes`
 experimental features. Use `sandbox = true` and `sandbox-fallback = false`
 in the builder's Nix configuration. Docker is needed only to load or run images;
-the loader requires Docker's containerd image store. The native distro builder uses a QEMU VM.
+the loader requires Docker's containerd image store. The native distro builder
+uses a QEMU VM, automatically using KVM when available and software emulation
+otherwise. Software builds are slower but need no `uid-range` daemon setup.
 
 Enter the pinned tooling environment with `nix-shell`. Other architectures are
 not currently validated; the supplied egress image is pinned to linux/amd64.
+
+## Load an environment
+
+From a Mango checkout, one command builds the images and loads them into Docker:
+
+```sh
+./bin/mango load /path/to/environment
+```
+
+The executable enters Nix tooling for you. You can also use
+`nix run path:/path/to/mango -- load /path/to/environment`, or, inside the
+development shell, `mango load /path/to/environment`.
+
+The launcher reads the environment's `mango.lock`, verifies its Git revision
+and NAR SHA-256 hash through Nix, and runs that revision's build **and runtime**
+tools. For an older environment without a lock it writes the launcher's frozen
+default pin once. It never advances an existing lock automatically. Keep the
+lock with the environment when copying, exporting or registering it.
+
+`mango lock /path/to/environment` creates a missing lock and verifies the pin
+without building images. To upgrade, explicitly edit the revision and matching
+`narHash` in the lock, then run `mango lock` to verify it. The lock's `version`
+field describes its schema, not the Mango release.
+
+`mango build PATH` builds without Docker. `mango compose PATH` builds, loads,
+and prints Compose startup commands; `mango run PATH --agent oracle` builds,
+loads, and runs a trial. Nix reuses already-built outputs. State defaults to
+`PATH/../build/<directory-name>`; `--workspace DIR` overrides it and must stay
+outside the environment. The historical `mango PATH ACTION` syntax remains
+available with its original separate-step semantics.
+
+The repository-root `mango.lock` is the launcher's default for previously
+unlocked environments. Release updates must deliberately update that file to
+the desired published commit and source hash; it does not track a branch.
 
 ## Library interface
 

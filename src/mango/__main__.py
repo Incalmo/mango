@@ -1,3 +1,3 @@
-from mango.cli import main
+from mango.launcher import main
 
 main()

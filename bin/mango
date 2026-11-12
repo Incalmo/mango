@@ -1,0 +1,10 @@
+#!/usr/bin/env nix-shell
+#!nix-shell -i python3 -p python3
+"""Run Mango from a checkout without first entering its development shell."""
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from mango.launcher import main
+
+main()

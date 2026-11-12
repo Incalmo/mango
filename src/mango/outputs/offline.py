@@ -143,7 +143,7 @@ def freeze(receipt, drvs):
             check=True,
             stdout=subprocess.DEVNULL,
         )
-    sizes = json.loads(run("nix", "path-info", "--json", *ordered))
+    sizes = json.loads(run("nix", "path-info", "--json", "--json-format", "1", *ordered))
     sizes = sizes.values() if isinstance(sizes, dict) else sizes
     receipt.write_text(
         json.dumps(

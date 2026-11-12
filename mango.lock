@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "mango": {
+    "url": "https://github.com/Incalmo/mango.git",
+    "rev": "439273431a88730e1579ee2bdc050dcb8dcad56a",
+    "narHash": "sha256-yiWBXxSkFz2HmOAEzdne3v9oAkMtzTgckYqsKNoBMds="
+  }
+}

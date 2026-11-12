@@ -10,7 +10,7 @@ dependencies = ["pydantic", "pyyaml", "zstandard"]
 harbor = ["harbor==0.23.0"]
 
 [project.scripts]
-mango = "mango.cli:main"
+mango = "mango.launcher:main"
 mango-pin-base = "mango.authoring.pin_base:main"
 mango-pin-source = "mango.authoring.pin_source:main"
 mango-pin-file = "mango.authoring.pin_file:main"
