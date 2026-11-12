@@ -32,7 +32,7 @@ let
     services = lib.mapAttrs (_: value:
       (builtins.removeAttrs value [ "container" ]) // {
         # Placeholder is only used before the loaded digest map is applied.
-        image = "incalmo-declared-${value.container}";
+        image = "mango-declared-${value.container}";
       }) values;
   };
 in

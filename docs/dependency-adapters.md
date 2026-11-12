@@ -3,7 +3,7 @@
 The contract is **resolve → fetch → prepare → build → image**. Only resolve and
 fetch may contact upstream services. Every downloaded file has a locked content
 hash. Fetch outputs and prepared layouts are ordinary Nix store objects,
-distributed through the Incalmo binary cache; no Maven/npm/PyPI proxy is needed.
+distributed through a Nix binary cache; no Maven/npm/PyPI proxy is needed.
 
 ## API
 

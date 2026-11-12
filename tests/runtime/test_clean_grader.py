@@ -48,7 +48,7 @@ class CleanGraderTests(unittest.TestCase):
             self.assertFalse((task / "tests/Dockerfile").exists())
             rendered = [
                 yaml.safe_load(path.read_text())
-                for path in (task / "tests").glob(".incalmo-compose-*.yaml")
+                for path in (task / "tests").glob(".mango-compose-*.yaml")
             ]
             self.assertEqual(
                 {doc["services"]["main"]["image"] for doc in rendered}, set(refs)

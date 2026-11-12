@@ -93,7 +93,7 @@ class ExportTests(unittest.TestCase):
         self.assertEqual(runtime["services"]["main"]["command"], ["sleep", "infinity"])
         self.assertIn("@sha256:", runtime["services"]["main"]["image"])
         self.assertEqual(
-            len(list((self.state / "runtime/tests").glob(".incalmo-images-*.json"))), 1
+            len(list((self.state / "runtime/tests").glob(".mango-images-*.json"))), 1
         )
         for excluded in ("examples", ".jj", ".git", "tests", "docs"):
             self.assertFalse((self.root / excluded).exists(), excluded)

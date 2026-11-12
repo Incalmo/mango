@@ -60,7 +60,7 @@ See [authoring tools](docs/authoring-tools.md) to pin a registry base image
 (`mango-lock-packages`).
 See [pinned-file serving](docs/pinned-files.md) when an offline package manager
 needs HTTP URLs for explicitly mapped local inputs. Run
-`incalmo-pinned-files --map map.json -- your-command` with immutable pinned files;
+`mango-pinned-files --map map.json -- your-command` with immutable pinned files;
 native builds explicitly mount the portable script and inputs read-only and use
 their own Python. Choose a fixed port when authored metadata or outputs embed URLs.
 

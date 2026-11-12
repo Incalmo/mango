@@ -7,7 +7,7 @@
   pinnedImage = import ./images/pinned-image.nix { inherit pkgs; };
   pinnedFilesScript = ../builders/pinned_files.py;
   pinnedFiles = pkgs.writeShellApplication {
-    name = "incalmo-pinned-files";
+    name = "mango-pinned-files";
     runtimeInputs = [ pkgs.python3 ];
     text = ''exec python3 ${../builders/pinned_files.py} "$@"'';
   };

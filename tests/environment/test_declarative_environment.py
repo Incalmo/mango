@@ -92,7 +92,7 @@ in mkEnvironment {
         self.assertTrue(doc["networks"]["internal"]["internal"])
         self.assertEqual((runtime / "environment/asset.txt").read_text(), "keep")
         grader = yaml.safe_load(
-            next((runtime / "tests").glob(".incalmo-compose-*.yaml")).read_text()
+            next((runtime / "tests").glob(".mango-compose-*.yaml")).read_text()
         )
         self.assertEqual(grader["services"]["main"]["image"], refs["grader"])
         self.assertFalse((self.root / "task/environment/docker-compose.yaml").exists())

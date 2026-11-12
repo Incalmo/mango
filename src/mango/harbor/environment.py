@@ -22,7 +22,7 @@ from mango.runtime.materialize import ImageOnlyDockerMixin
 DEFAULT_SERVICE_MEMORY = "12g"
 
 #: Overrides the ceiling with a compose size ("8g", "4096m"); "none" disables it.
-SERVICE_MEMORY_ENV = "INCALMO_LOCAL_SERVICE_MEMORY"
+SERVICE_MEMORY_ENV = "MANGO_LOCAL_SERVICE_MEMORY"
 
 MEMORY_OVERLAY_NAME = "docker-compose-memory.yaml"
 
@@ -75,9 +75,9 @@ class LocalMemoryCapMixin:
     """
 
     def _memory_overlay(self) -> Path | None:
-        if not hasattr(self, "_incalmo_memory_overlay"):
-            self._incalmo_memory_overlay = self._write_memory_overlay()
-        return self._incalmo_memory_overlay
+        if not hasattr(self, "_mango_memory_overlay"):
+            self._mango_memory_overlay = self._write_memory_overlay()
+        return self._mango_memory_overlay
 
     def _write_memory_overlay(self) -> Path | None:
         limit = service_memory()
@@ -93,8 +93,8 @@ class LocalMemoryCapMixin:
         )
         if not services:
             return None
-        self._incalmo_memory_dir = tempfile.TemporaryDirectory(prefix="incalmo-memory-")
-        path = Path(self._incalmo_memory_dir.name) / MEMORY_OVERLAY_NAME
+        self._mango_memory_dir = tempfile.TemporaryDirectory(prefix="mango-memory-")
+        path = Path(self._mango_memory_dir.name) / MEMORY_OVERLAY_NAME
         overlay = {"services": {name: {"mem_limit": limit} for name in services}}
         path.write_text(yaml.safe_dump(overlay, sort_keys=True), encoding="utf-8")
         return path
