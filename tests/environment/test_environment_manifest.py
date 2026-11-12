@@ -82,7 +82,7 @@ class EnvironmentManifestTests(unittest.TestCase):
         self.assertEqual(loaded["verifiers"][keys[1]], {"main": refs["gradeB"]})
         self.assertEqual(loaded["recipe_version"], 3)
         self.assertIn("environment", loaded["runtime"]["compose"])
-        files = sorted((work / "runtime/steps").glob("*/tests/.incalmo-compose-*.yaml"))
+        files = sorted((work / "runtime/steps").glob("*/tests/.mango-compose-*.yaml"))
         alpha, beta = [yaml.safe_load(file.read_text())["services"] for file in files]
         self.assertEqual(alpha["database"]["image"], refs["gradeDb"])
         self.assertEqual(beta["main"]["image"], refs["gradeB"])

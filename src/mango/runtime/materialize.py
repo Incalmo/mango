@@ -17,8 +17,8 @@ from mango.runtime.manifest import BUILD_RECIPE_VERSION, BuildManifest
 
 SIDECAR_SERVICE = "harbor-docker-egress-control-sidecar"
 # File names shared with the hosted prebuilt-image adapter; keep them stable.
-MANIFEST_NAME = ".incalmo-images.json"
-EGRESS_BUILD_SERVICE = "incalmo-egress"
+MANIFEST_NAME = ".mango-images.json"
+EGRESS_BUILD_SERVICE = "mango-egress"
 
 
 def verifier_variant(config: dict) -> str:
@@ -65,7 +65,7 @@ def verifier_environments(task: Path) -> dict[str, tuple[Path, dict]]:
 
 def verifier_target(key: str, service: str) -> str:
     return (
-        "incalmo-verifier-"
+        "mango-verifier-"
         + hashlib.sha256(key.encode()).hexdigest()[:16]
         + "-"
         + service
@@ -181,7 +181,7 @@ def _materialize_environment(task, environment, config, manifest, variant=None):
     path = compose_path(task, environment=environment)
     environment.mkdir(parents=True, exist_ok=True)
     target = environment / (
-        f".incalmo-compose-{variant}.yaml" if variant else "docker-compose.yaml"
+        f".mango-compose-{variant}.yaml" if variant else "docker-compose.yaml"
     )
     target.write_text(yaml.safe_dump(document, sort_keys=False))
     if variant and not path.exists():
@@ -191,7 +191,7 @@ def _materialize_environment(task, environment, config, manifest, variant=None):
         path.write_text(yaml.safe_dump(document, sort_keys=False))
     if not variant and path != target and path.exists():
         path.unlink()
-    name = f".incalmo-images-{variant}.json" if variant else MANIFEST_NAME
+    name = f".mango-images-{variant}.json" if variant else MANIFEST_NAME
     (environment / name).write_text(manifest.model_dump_json())
 
 
@@ -203,26 +203,26 @@ class ImageOnlyDockerMixin:
     """
 
     def _image_variant(self):
-        if not hasattr(self, "_incalmo_image_variant"):
-            self._incalmo_image_variant = (
+        if not hasattr(self, "_mango_image_variant"):
+            self._mango_image_variant = (
                 None
                 if self.environment_dir.name == "environment"
                 else verifier_variant(
                     {"docker_image": self.task_env_config.docker_image}
                 )
             )
-        return self._incalmo_image_variant
+        return self._mango_image_variant
 
     @property
     def _environment_docker_compose_path(self):
         variant = self._image_variant()
         return self.environment_dir / (
-            f".incalmo-compose-{variant}.yaml" if variant else "docker-compose.yaml"
+            f".mango-compose-{variant}.yaml" if variant else "docker-compose.yaml"
         )
 
     def _image_manifest(self) -> BuildManifest:
         variant = self._image_variant()
-        name = f".incalmo-images-{variant}.json" if variant else MANIFEST_NAME
+        name = f".mango-images-{variant}.json" if variant else MANIFEST_NAME
         return BuildManifest.model_validate_json(
             (self.environment_dir / name).read_text()
         )

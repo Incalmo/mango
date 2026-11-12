@@ -58,7 +58,7 @@ def _literal_dollars(value):
 
 def _render(context, config, manifest, label, work, phase_policies):
     project = (
-        "incalmo-" + hashlib.sha256(str(work).encode()).hexdigest()[:12] + "-" + label
+        "mango-" + hashlib.sha256(str(work).encode()).hexdigest()[:12] + "-" + label
     )
     environment = ComposeRenderer(
         environment_dir=context,

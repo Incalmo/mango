@@ -88,14 +88,14 @@ emit() {
       $1 == key { $1=""; sub(/^ /, ""); if (n++) printf ", "; printf "%s", $0 }
     ')
     if [ "$mode" = sets ]; then
-      printf '  set incalmo_private_%s {\n    type %s\n' "$name" "$type"
+      printf '  set mango_private_%s {\n    type %s\n' "$name" "$type"
       printf '    flags timeout\n    timeout 90s\n'
       if [ -n "$elements" ]; then printf '    elements = { %s }\n' "$elements"; fi
       printf '  }\n'
     else
-      printf 'flush set inet gost_egress incalmo_private_%s\n' "$name"
+      printf 'flush set inet gost_egress mango_private_%s\n' "$name"
       if [ -n "$elements" ]; then
-        printf 'add element inet gost_egress incalmo_private_%s { %s }\n' "$name" "$elements"
+        printf 'add element inet gost_egress mango_private_%s { %s }\n' "$name" "$elements"
       fi
     fi
   done
@@ -105,7 +105,7 @@ case "${1:-}" in
   sets|update) emit "$1" ;;
   clear)
     for name in v4 v6 v4_ports v6_ports; do
-      printf 'flush set inet gost_egress incalmo_private_%s\n' "$name"
+      printf 'flush set inet gost_egress mango_private_%s\n' "$name"
     done
     ;;
   watch)

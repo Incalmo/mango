@@ -56,7 +56,7 @@ class PinnedFilesTests(unittest.TestCase):
     def request(self, target, method="GET"):
         return self.invoke(f"""
 import http.client, os, urllib.parse, json
-url=urllib.parse.urlsplit(os.environ["INCALMO_PINNED_FILES_URL"])
+url=urllib.parse.urlsplit(os.environ["MANGO_PINNED_FILES_URL"])
 c=http.client.HTTPConnection(url.hostname,url.port)
 c.request({method!r},{target!r})
 r=c.getresponse()
@@ -121,7 +121,7 @@ c.close()
     def test_child_exit_and_parallel_ephemeral_ports(self):
         result = self.invoke("raise SystemExit(23)")
         self.assertEqual(result.returncode, 23)
-        code = 'import os,time;print(os.environ["INCALMO_PINNED_FILES_URL"],flush=True);time.sleep(.4)'
+        code = 'import os,time;print(os.environ["MANGO_PINNED_FILES_URL"],flush=True);time.sleep(.4)'
         with ThreadPoolExecutor(max_workers=3) as executor:
             results = list(executor.map(lambda _: self.invoke(code), range(3)))
         self.assertTrue(all(r.returncode == 0 for r in results))
@@ -136,7 +136,7 @@ c.close()
         code = f"""
 import os,json,time
 from pathlib import Path
-Path({str(ready)!r}).write_text(json.dumps([os.getpid(),os.environ["INCALMO_PINNED_FILES_URL"]]))
+Path({str(ready)!r}).write_text(json.dumps([os.getpid(),os.environ["MANGO_PINNED_FILES_URL"]]))
 time.sleep(60)
 """
         child = subprocess.Popen(
@@ -167,9 +167,6 @@ class PinnedFilesNixTests(unittest.TestCase):
                 "nix-build",
                 "--no-out-link",
                 "--option",
-                "substituters",
-                "",
-                "--option",
                 "builders",
                 "",
                 "--expr",
@@ -180,7 +177,7 @@ class PinnedFilesNixTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         executable = (
-            Path(result.stdout.strip().splitlines()[-1]) / "bin/incalmo-pinned-files"
+            Path(result.stdout.strip().splitlines()[-1]) / "bin/mango-pinned-files"
         )
         result = subprocess.run(
             [str(executable), "--help"], text=True, capture_output=True
@@ -198,7 +195,7 @@ let
   });
   probe = h.pkgs.writeText "probe.py" ''
     import os, urllib.request
-    with urllib.request.urlopen(os.environ["INCALMO_PINNED_FILES_URL"] + "/fixture") as response:
+    with urllib.request.urlopen(os.environ["MANGO_PINNED_FILES_URL"] + "/fixture") as response:
         assert response.read() == b"explicit pinned fixture"
   '';
 in h.mkLinuxImage {
@@ -224,9 +221,6 @@ in h.mkLinuxImage {
             [
                 "nix-build",
                 "--no-out-link",
-                "--option",
-                "substituters",
-                "",
                 "--option",
                 "builders",
                 "",

@@ -104,7 +104,7 @@ class PublishTests(unittest.TestCase):
         self.assertEqual(runtime["services"]["main"]["image"], manifest.services["main"])
         self.assertEqual(runtime["services"]["main"]["command"], ["sleep", "infinity"])
         self.assertEqual((task / "instruction.md").read_text(), "Solve it.\n")
-        self.assertTrue(list((task / "tests").glob(".incalmo-images-*.json")))
+        self.assertTrue(list((task / "tests").glob(".mango-images-*.json")))
         self.assertFalse((self.root / "task/environment").exists())
         with self.assertRaisesRegex(ValueError, "destination exists"):
             generate_task(self.root, manifest.runtime, task)

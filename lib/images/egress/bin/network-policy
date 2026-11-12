@@ -91,10 +91,10 @@ $private_endpoint_sets
     fib daddr type local return
 $(/opt/egress-sidecar/docker-dns-rules return)
 $(/opt/egress-sidecar/range-bypass-rules return)
-    ip daddr @incalmo_private_v4 meta l4proto tcp redirect to :$GOST_PORT
-    ip6 daddr @incalmo_private_v6 meta l4proto tcp redirect to :$GOST_PORT
-    ip daddr . tcp dport @incalmo_private_v4_ports redirect to :$GOST_PORT
-    ip6 daddr . tcp dport @incalmo_private_v6_ports redirect to :$GOST_PORT
+    ip daddr @mango_private_v4 meta l4proto tcp redirect to :$GOST_PORT
+    ip6 daddr @mango_private_v6 meta l4proto tcp redirect to :$GOST_PORT
+    ip daddr . tcp dport @mango_private_v4_ports redirect to :$GOST_PORT
+    ip6 daddr . tcp dport @mango_private_v6_ports redirect to :$GOST_PORT
 $(/opt/egress-sidecar/private-space-rules return)
 $(nft_dns_rules return)
     meta l4proto tcp redirect to :$GOST_PORT

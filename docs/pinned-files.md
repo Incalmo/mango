@@ -20,8 +20,8 @@ let
     };
   });
 in h.pkgs.runCommand "application" { nativeBuildInputs = [h.pinnedFiles]; } ''
-  incalmo-pinned-files --map ${map} -- sh -c '
-    export npm_config_registry="$INCALMO_PINNED_FILES_URL"
+  mango-pinned-files --map ${map} -- sh -c '
+    export npm_config_registry="$MANGO_PINNED_FILES_URL"
     exec your-authored-offline-build-command
   '
 ''
@@ -53,7 +53,7 @@ inputs = h.pkgs.linkFarm "native-inputs" [
 buildScript = ''
   python3 /.nix-inputs/files/serve.py \
     --map /.nix-inputs/files/map.json -- sh -c '
-      export npm_config_registry="$INCALMO_PINNED_FILES_URL"
+      export npm_config_registry="$MANGO_PINNED_FILES_URL"
       exec your-authored-offline-build-command
     '
 '';
@@ -81,7 +81,7 @@ The surrounding native build remains without an external network interface.
 - The listener is ready before the child starts. An ephemeral port is the default;
   `--port N` requests a fixed port. Use an authored fixed port in an isolated
   native VM when metadata contains absolute URLs or a package manager saves the
-  endpoint in its output; random ports would then harm reproducibility. The child receives `INCALMO_PINNED_FILES_URL`
+  endpoint in its output; random ports would then harm reproducibility. The child receives `MANGO_PINNED_FILES_URL`
   without a trailing slash. Parallel invocations can use independent default ports.
 - A missing request reports `not in pinned file map: METHOD PATH`. Missing,
   invalid, unsupported or failed requests make the wrapper fail even if the child

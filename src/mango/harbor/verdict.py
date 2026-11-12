@@ -170,7 +170,7 @@ def run_trial(
     expected_steps = [
         {"name": step.name, "min_reward": step.min_reward} for step in task.steps or []
     ]
-    name = f"incalmo-{agent}-{uuid.uuid4().hex}"
+    name = f"mango-{agent}-{uuid.uuid4().hex}"
     jobs = work / "jobs"
     jobs.mkdir(parents=True, exist_ok=True)
     job = jobs / name

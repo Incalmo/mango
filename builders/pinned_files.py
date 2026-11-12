@@ -170,7 +170,7 @@ def run(mapped, port, command):
             for signum in (signal.SIGTERM, signal.SIGINT):
                 previous[signum] = signal.signal(signum, interrupt)
             environment = os.environ.copy()
-            environment["INCALMO_PINNED_FILES_URL"] = (
+            environment["MANGO_PINNED_FILES_URL"] = (
                 f"http://127.0.0.1:{server.server_port}"
             )
             child = subprocess.Popen(command, env=environment, start_new_session=True)
