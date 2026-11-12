@@ -24,6 +24,9 @@ from mango.runtime.materialize import verifier_environments
 from mango.runtime.task import relative_path
 
 Name = Annotated[str, Field(pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$")]
+# Compose service keys may include dots; image output names remain simple Nix
+# attribute path components because they are addressed as images.<name>.
+ServiceName = Annotated[str, Field(pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_.-]*$")]
 Attribute = Annotated[str, Field(min_length=1)]
 DECLARATION_VERSION = 1
 
@@ -38,9 +41,9 @@ class EnvironmentManifest(BaseModel):
     task: str = "task"
     images: dict[Name, Attribute] = Field(min_length=1)
     builds: dict[Name, Attribute] = Field(default_factory=dict)
-    services: dict[Name, Name] = Field(min_length=1)
+    services: dict[ServiceName, Name] = Field(min_length=1)
     #: Harbor verifier key (context/variant) to service-to-image mapping.
-    verifiers: dict[str, dict[Name, Name]] = Field(default_factory=dict)
+    verifiers: dict[str, dict[ServiceName, Name]] = Field(default_factory=dict)
     environment_files: dict[str, str] = Field(default_factory=dict)
     executable_files: list[str] = Field(default_factory=list)
 

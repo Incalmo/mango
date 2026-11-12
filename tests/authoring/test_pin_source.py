@@ -84,6 +84,25 @@ class PinTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "unable to access"):
                 pin_source.pin(URL, BRANCH)
 
+    def test_git_metadata_options_are_bound_to_hash_and_returned(self):
+        with patch(
+            "mango.authoring.pin_source.subprocess.run",
+            return_value=subprocess.CompletedProcess([], 1, "", MISMATCH),
+        ) as run:
+            value = pin_source.pin(URL, BRANCH, deep_clone=True,
+                                   fetch_tags=True, fetch_submodules=False)
+        expression = run.call_args.args[0][-1]
+        for name, expected in {'leaveDotGit': True, 'deepClone': True,
+                               'fetchTags': True, 'fetchSubmodules': False}.items():
+            self.assertIs(value[name], expected)
+            self.assertIn(f'{name} = {str(expected).lower()};', expression)
+
+    def test_unrecognized_fetchgit_options_are_rejected_before_execution(self):
+        with patch("mango.authoring.pin_source.subprocess.run") as run:
+            with self.assertRaises(ValueError):
+                pin_source.content_hash(URL, BRANCH, {'postFetch': 'bad'})
+        run.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

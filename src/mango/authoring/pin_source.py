@@ -11,6 +11,7 @@ printed ``{ repository; commit; hash; }``; builds never resolve refs.
 """
 
 import argparse
+import hashlib
 import json
 import re
 import subprocess
@@ -43,14 +44,21 @@ def resolve_commit(repository: str, rev: str) -> str:
     raise ValueError(f"{repository} has no branch or tag named {rev!r}")
 
 
-def content_hash(repository: str, commit: str) -> str:
+def content_hash(repository: str, commit: str, options: dict | None = None) -> str:
     """Fetch with a fake hash and read the real one from Nix's mismatch report."""
+    options = options or {}
+    allowed = {"leaveDotGit", "deepClone", "fetchSubmodules", "fetchTags"}
+    if set(options) - allowed or any(type(value) is not bool for value in options.values()):
+        raise ValueError("Unsupported fetchgit options")
+    option_fields = " ".join(f"{key} = {json.dumps(value)};" for key, value in options.items())
+    suffix = hashlib.sha256(json.dumps(options, sort_keys=True).encode()).hexdigest()[:8]
     expression = (
         f"let h = import {json.dumps(str(HARNESS))} {{}}; in h.pkgs.fetchgit {{ "
         f"url = {json.dumps(repository)}; rev = {json.dumps(commit)}; "
         f"hash = h.pkgs.lib.fakeHash; "
+        f"{option_fields} "
         # A unique name keeps parallel probes from sharing one store lock.
-        f'name = "probe-{commit[:12]}"; }}'
+        f'name = "probe-{commit[:12]}-{suffix}"; }}'
     )
     result = subprocess.run(
         ["nix-build", "--no-out-link", "--expr", expression],
@@ -64,12 +72,23 @@ def content_hash(repository: str, commit: str) -> str:
     return match.group(1)
 
 
-def pin(repository: str, rev: str = "HEAD") -> dict:
+def pin(repository: str, rev: str = "HEAD", *, leave_dot_git: bool = False,
+        deep_clone: bool = False, fetch_tags: bool = False,
+        fetch_submodules: bool = True) -> dict:
     commit = resolve_commit(repository, rev)
+    options = {}
+    if leave_dot_git or deep_clone or fetch_tags or not fetch_submodules:
+        options = {
+            "leaveDotGit": leave_dot_git or deep_clone or fetch_tags,
+            "deepClone": deep_clone,
+            "fetchTags": fetch_tags,
+            "fetchSubmodules": fetch_submodules,
+        }
     return {
         "repository": repository,
         "commit": commit,
-        "hash": content_hash(repository, commit),
+        "hash": content_hash(repository, commit, options),
+        **options,
     }
 
 
@@ -84,8 +103,14 @@ def main():
         "--rev", default="HEAD", help="branch, tag, HEAD or full commit (default: HEAD)"
     )
     parser.add_argument("--nix", action="store_true", help="print a Nix attribute set")
+    parser.add_argument("--leave-dot-git", action="store_true", help="retain Git metadata")
+    parser.add_argument("--deep-clone", action="store_true", help="fetch full history and retain Git metadata")
+    parser.add_argument("--fetch-tags", action="store_true", help="fetch tags and retain Git metadata")
+    parser.add_argument("--no-submodules", action="store_true", help="do not fetch submodules")
     args = parser.parse_args()
-    value = pin(args.repository, args.rev)
+    value = pin(args.repository, args.rev, leave_dot_git=args.leave_dot_git,
+                deep_clone=args.deep_clone, fetch_tags=args.fetch_tags,
+                fetch_submodules=not args.no_submodules)
     print(nix(value) if args.nix else json.dumps(value))
 
 

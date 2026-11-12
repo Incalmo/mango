@@ -180,4 +180,4 @@ ISOLATION
       chmod -R u+w -- "$2"
     '';
   };
-}
+} // import ./pnpm.nix { inherit pkgs; }

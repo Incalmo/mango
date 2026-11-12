@@ -19,7 +19,7 @@ import stat
 import subprocess
 import tarfile
 import tempfile
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from pathlib import Path, PurePosixPath
 
 from artifacts import export_artifacts
@@ -128,7 +128,7 @@ def layer_path(value):
 
 
 def snapshot(root):
-    """Metadata of every path; a replaced file gets a new inode or mtime."""
+    """Track file metadata including xattr-only ACL/capability changes."""
     state = {}
     for directory, dirs, files in os.walk(root):
         relative_dir = os.path.relpath(directory, root)
@@ -150,6 +150,12 @@ def snapshot(root):
                 info.st_uid,
                 info.st_gid,
                 link,
+                tuple(sorted(
+                    (key, os.getxattr(os.path.join(directory, name), key,
+                                      follow_symlinks=False))
+                    for key in os.listxattr(os.path.join(directory, name),
+                                            follow_symlinks=False)
+                )),
             )
         dirs[:] = [
             d
@@ -258,6 +264,66 @@ def mounted_inputs(source, destination):
                 subprocess.run(["umount", "-R", str(destination)], check=True)
 
 
+def root_path(root, value):
+    """Resolve a declared build path without allowing host-path escapes."""
+    if not isinstance(value, str) or not value.startswith("/") or ".." in PurePosixPath(value).parts:
+        raise ValueError(f"Build mount paths must be absolute without '..': {value!r}")
+    path = (root / value.lstrip("/")).resolve()
+    if path == root.resolve() or not path.is_relative_to(root.resolve()):
+        raise ValueError(f"Build mount path escapes or covers root: {value!r}")
+    return path
+
+
+@contextmanager
+def step_mount(root, spec):
+    """Temporarily bind an authored input, restoring the target afterward."""
+    if set(spec) != {"source", "target", "readOnly"} or not isinstance(spec["readOnly"], bool):
+        raise ValueError("Build mounts require source, target and an explicit readOnly boolean")
+    source = root_path(root, spec["source"])
+    target = root_path(root, spec["target"])
+    if not source.exists() or not (source.is_dir() or source.is_file()):
+        raise ValueError(f"Missing or unsupported build mount source: {spec['source']}")
+    reserved = [root / name for name in ("proc", "sys", "dev", INPUTS)]
+    if any(target == p or target.is_relative_to(p) or p.is_relative_to(target) for p in reserved):
+        raise ValueError("Build mounts cannot cover runtime or input mounts")
+    if source == target or source.is_relative_to(target) or target.is_relative_to(source):
+        raise ValueError("Build mount source and target must not overlap")
+    created = []
+    mounted = False
+    try:
+        parent = target.parent
+        missing = []
+        while not parent.exists():
+            missing.append(parent)
+            parent = parent.parent
+        for directory in reversed(missing):
+            directory.mkdir()
+            created.append(directory)
+        if not target.exists():
+            target.mkdir() if source.is_dir() else target.touch()
+            created.append(target)
+        elif source.is_dir() != target.is_dir():
+            raise ValueError("Build mount source and target types differ")
+        subprocess.run(["mount", "--bind", str(source), str(target)], check=True)
+        mounted = True
+        # A separate remount is required by the kernel to enforce readonly on
+        # a bind mount. Keep the source writable for later authored steps.
+        if spec["readOnly"]:
+            subprocess.run(["mount", "-o", "remount,bind,ro", str(target)], check=True)
+        yield
+    finally:
+        if mounted:
+            subprocess.run(["umount", str(target)], check=True)
+        for path in reversed(created):
+            if path.is_dir():
+                # Commands may intentionally write siblings in a new parent.
+                # Remove only empty scaffolding, retaining those authored files.
+                if not any(path.iterdir()):
+                    path.rmdir()
+            else:
+                path.unlink()
+
+
 def build(args):
     plan = json.loads(Path(args.plan).read_text())
     if plan.get("requireOffline") and any(
@@ -307,7 +373,11 @@ def build(args):
                     if "sourceDateEpoch" in plan:
                         run_env["SOURCE_DATE_EPOCH"] = str(plan["sourceDateEpoch"])
                     run_env.update(plan.get("buildEnv", {}))
-                    run_in_chroot(root, step["cmd"], run_env, workdir)
+                    run_env.update(step.get("env", {}))
+                    with ExitStack() as mounts:
+                        for mount in step.get("mounts", []):
+                            mounts.enter_context(step_mount(root, mount))
+                        run_in_chroot(root, step["cmd"], run_env, step.get("workdir", workdir))
                 else:
                     raise ValueError(f"Unsupported step {op}")
     finally:
