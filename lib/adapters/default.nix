@@ -149,6 +149,7 @@ PYTHON
     assert lib.assertMsg (builtins.all (r: lib.hasSuffix ".apk" r.path && !lib.hasInfix "/" r.path) artifacts)
       "apk cache requires flat .apk filenames";
     fetchDependencyCache { inherit name artifacts; };
+  fetchComposerCache = import ./composer.nix { inherit pkgs fetchDependencyCache; };
   fetchBunCache = args: import ./bun-cache.nix ({ inherit pkgs; } // args);
   mkOfflineApplication = args:
     assert lib.assertMsg (!(args ? outputHash) && !(args.__noChroot or false)

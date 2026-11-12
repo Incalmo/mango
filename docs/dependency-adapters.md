@@ -119,3 +119,8 @@ provided pnpm version. See [pnpm cache inputs](pnpm-cache.md) for the supported
 store layouts, workspace inventory, and original-target offline validation steps.
 The adapter's evaluation and input checks do not establish that a particular
 application builds offline; that requires its real toolchain and build commands.
+
+## Composer cache inputs
+
+`dependencies.fetchComposerCache` lays out pinned Composer dist archives at their
+observed cache paths. See [Composer cache inputs](composer-cache.md).

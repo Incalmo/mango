@@ -37,6 +37,11 @@ with `fetchgit`'s defaults, submodules included. A full commit is not resolved
 again. Do not hash a checkout with `nix hash path`: it includes `.git` and
 skips submodules, so the build rejects it.
 
+Hash probes use a unique temporary output name and delete only that invocation's
+fake-hash output and relocated result with Nix's normal liveness checks. Cleanup
+failure prints a warning without discarding the discovered hash. This does not
+garbage-collect other sources or dependency caches.
+
 If build scripts require Git metadata, pass `--leave-dot-git`; use
 `--deep-clone` for history and `--fetch-tags` for tags. Both imply retaining
 `.git`. `--no-submodules` disables submodule fetching. Nondefault requests
