@@ -28,16 +28,23 @@ in {
 
   # The author supplies shell commands and input files. No Dockerfile or package
   # metadata is discovered or interpreted. The original distro's /bin/sh and
-  # installers run as root in an isolated VM with no network device.
+  # installers run as root with no network device, either in a QEMU VM
+  # (isolation = "vm", needs the `kvm` system feature for practical speed) or in
+  # the Nix sandbox itself under a full user-namespace uid range
+  # (isolation = "namespace", needs the `uid-range` system feature: Nix's
+  # `auto-allocate-uids`; no VM and no KVM). Both run the same rootfs.py build
+  # and produce the same layer.
   mkLinuxImage = { name, base, inputs ? pkgs.emptyDirectory, context ? pkgs.emptyDirectory
     , buildScript, buildEnv ? {}, config ? {}, diskSize ? 16384, memSize ? 4096
-    , sourceDateEpoch ? 1, exportPaths ? [], cores ? 1 }:
+    , sourceDateEpoch ? 1, exportPaths ? [], cores ? 1, isolation ? "vm" }:
     assert lib.assertMsg (pkgs.stdenv.hostPlatform.system == "x86_64-linux")
       "mkLinuxImage currently supports x86_64-linux only";
     assert lib.assertMsg (builtins.isList exportPaths && builtins.all builtins.isString exportPaths)
       "mkLinuxImage exportPaths must be a list of absolute paths";
     assert lib.assertMsg (builtins.isInt cores && cores >= 1 && cores <= 255)
       "mkLinuxImage cores must be an integer from 1 to 255";
+    assert lib.assertMsg (builtins.elem isolation [ "vm" "namespace" ])
+      "mkLinuxImage isolation must be \"vm\" or \"namespace\"";
     let
       # Stable component names let script-only edits reuse large byte inventories.
       materialize = source: pkgs.runCommand "linux-build-inputs" {} ''
@@ -74,7 +81,7 @@ in {
       '');
       # Keep serial output separate from QEMU's monitor, then report it even
       # when vmTools aborts before its postVM hook (for example on build failure).
-      layer = lib.overrideDerivation vm (old: {
+      vmLayer = lib.overrideDerivation vm (old: {
         args = [ "-c" ''
           ${lib.escapeShellArg old.builder} ${lib.escapeShellArgs old.args}
           status=$?
@@ -86,6 +93,17 @@ in {
           exit "$status"
         '' ];
       });
+      # The sandbox is the isolation: a private network namespace with only
+      # loopback, and uid 0 mapped over a 65536-uid range so installers can
+      # chown to their service users.
+      namespaceLayer = pkgs.runCommand "${name}-layer" {
+        requiredSystemFeatures = [ "uid-range" ];
+        nativeBuildInputs = [ python pkgs.util-linux pkgs.iproute2 ];
+      } ''
+        python ${runner} build --base ${base} --plan ${plan} \
+          --inputs ${staged} --root "$TMPDIR/rootfs" --out $out
+      '';
+      layer = if isolation == "namespace" then namespaceLayer else vmLayer;
       artifacts = pkgs.runCommand "${name}-artifacts.tar" {} ''
         cp ${layer}/artifacts.tar $out
       '';

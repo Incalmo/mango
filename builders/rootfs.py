@@ -263,7 +263,7 @@ def build(args):
     if plan.get("requireOffline") and any(
         name != "lo" for _, name in socket.if_nameindex()
     ):
-        raise RuntimeError("Linux image build requires a VM with no network device")
+        raise RuntimeError("Linux image build requires an environment with no network device")
     base = BaseImage(args.base)
     manifest = base.manifest
     root = Path(args.root)
@@ -284,7 +284,9 @@ def build(args):
     for mount in ("proc", "sys", "dev", INPUTS):
         (root / mount).mkdir(exist_ok=True)
     subprocess.run(["mount", "--rbind", "/dev", str(root / "dev")], check=True)
-    subprocess.run(["mount", "--rbind", "/sys", str(root / "sys")], check=True)
+    # The Nix sandbox (isolation = "namespace") has no /sys; a VM does.
+    if Path("/sys/kernel").is_dir():
+        subprocess.run(["mount", "--rbind", "/sys", str(root / "sys")], check=True)
     try:
         with mounted_inputs(args.inputs, root / INPUTS):
             for index, step in enumerate(plan["steps"]):

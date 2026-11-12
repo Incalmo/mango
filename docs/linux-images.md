@@ -40,10 +40,38 @@ once when adopting the helper, so rerun the affected qualification checks.
 | `diskSize`, `memSize` | Scratch disk and memory sizes in MiB; defaults 16384 and 4096 |
 | `exportPaths` | Absolute paths to export as a separate `.artifacts` tar; defaults to `[]` |
 | `sourceDateEpoch` | Timestamp for new layer entries and build `SOURCE_DATE_EPOCH`; defaults to 1 |
+| `isolation` | `"vm"` (default): a QEMU VM. `"namespace"`: the Nix sandbox itself, no VM; see below |
 
 The script runs as root using the base's `/bin/sh` in a QEMU Linux VM with no
 network device. Loopback is enabled for local service tests; a guard rejects a
 VM that has any other interface.
+
+## Without KVM: `isolation = "namespace"`
+
+A VM build needs the `kvm` system feature for practical speed (on a cloud VM,
+nested virtualization). With `isolation = "namespace"` the same build runs in
+the Nix sandbox instead: root inside a user namespace mapped over 65536 uids,
+so installers can create service users and `chown` to them, in the sandbox's
+private network namespace with only loopback. It runs the same `rootfs.py`
+build and produces the same layer; a test image built both ways gave a
+byte-identical `layer.tar`, including setuid bits, new users and groups, and
+whiteouts. `cores`, `diskSize` and `memSize` apply only to the VM.
+
+The building Nix must allow it:
+
+```
+experimental-features = auto-allocate-uids cgroups
+auto-allocate-uids = true
+system-features = uid-range
+filter-syscalls = false
+sandbox = true
+```
+
+`uid-range` derivations need a sandboxed build as root or through the daemon.
+`filter-syscalls = false` lets the build set setuid/setgid bits, which the
+default seccomp filter refuses; the bits land in the image layer tar, never as
+setuid files in the store. Without these settings Nix refuses the build with
+"missing system features" instead of degrading.
 Files are available read-only at `/.nix-inputs/files` and source at
 `/.nix-inputs/context`. The author copies anything needed into writable cache
 directories, runs the installers in offline mode, and removes temporary data.
