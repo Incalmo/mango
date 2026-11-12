@@ -172,6 +172,10 @@ nix-shell --run 'RUN_LINUX_VM_TESTS=1 python -m unittest discover -s tests -t . 
 ```
 
 Tests create disposable synthetic inputs at runtime; no environment is bundled.
+Integration builds use the configured Nix binary caches so a fresh runner can
+download pinned toolchains instead of compiling them from source. Disabling
+substituters does not isolate a build's network access; CI enforces the Nix
+sandbox, and the isolated-store check below verifies offline rebuilding.
 The isolated-store check restores signed cache objects into a fresh store and
 rebuilds with an outer network namespace. It requires Linux user namespaces.
 It fails if any rebuilt output differs from the original output's NAR hash.
