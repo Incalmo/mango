@@ -10,7 +10,10 @@ import re
 import shlex
 import subprocess
 import sys
+from contextlib import ExitStack
 from pathlib import Path
+
+from mango import cache
 
 ROOT = Path(__file__).resolve().parents[2]
 ACTIONS = {
@@ -62,7 +65,7 @@ def ensure_lock(root):
     return read_lock(path)
 
 
-def resolve(pin):
+def resolve(pin, env=None):
     source = {"type": "git", "allRefs": True, **pin}
     expression = (
         "(builtins.fetchTree (builtins.fromJSON "
@@ -83,6 +86,7 @@ def resolve(pin):
         check=True,
         text=True,
         stdout=subprocess.PIPE,
+        env=env,
     )
     harness = Path(json.loads(result.stdout))
     if not (harness / "shell.nix").is_file():
@@ -122,48 +126,54 @@ def main(argv=None):
     parser.add_argument("environment", type=Path)
     parser.add_argument("--workspace", type=Path)
     try:
-        if argv and argv[0] not in ACTIONS | {"lock", "--help", "-h"}:
-            # Preserve the old CLI's flags and semantics, but select its harness
-            # from the environment lock when one exists.
-            root = Path(argv[0]).resolve()
-            if not (root / "default.nix").is_file():
-                parser.error(f"no default.nix at {root}")
-            lock = root / "mango.lock"
-            harness = resolve(read_lock(lock)) if lock.exists() else ROOT
-            command = invocation(harness, argv)
-        else:
-            args, extra = parser.parse_known_args(argv)
-            root = args.environment.resolve()
-            if not (root / "default.nix").is_file():
-                parser.error(f"no default.nix at {root}")
-            if args.action == "lock" and extra:
-                parser.error(
-                    "lock takes no additional arguments; edit mango.lock to upgrade"
-                )
-            workspace = (args.workspace or root.parent / "build" / root.name).resolve()
-            if workspace.is_relative_to(root) or root.is_relative_to(workspace):
-                parser.error("workspace must be separate from the environment")
-            pin = ensure_lock(root)
-            harness = resolve(pin)
-            if args.action == "lock":
-                print(
-                    json.dumps(
-                        {"lock": str(root / "mango.lock"), "harness": str(harness)}
-                    )
-                )
-                return
-            steps = {
-                "load": ["fetch", "load"],
-                "compose": ["fetch", "load", "compose"],
-                "run": ["fetch", "load", "run"],
-            }.get(args.action, [args.action])
-            command = invocation(
-                harness, [str(root), str(workspace), args.action, extra], steps
-            )
-        raise SystemExit(subprocess.run(command).returncode)
-    except (OSError, ValueError, subprocess.CalledProcessError) as error:
+        with ExitStack() as stack:
+            return launch(argv, parser, stack)
+    except (OSError, ValueError, subprocess.SubprocessError) as error:
         parser.exit(1, f"mango: {error}\n")
 
+
+def launch(argv, parser, stack):
+    if argv and argv[0] not in ACTIONS | {"lock", "--help", "-h"}:
+        # Preserve the old CLI's flags and semantics, but select its harness
+        # from the environment lock when one exists.
+        root = Path(argv[0]).resolve()
+        if not (root / "default.nix").is_file():
+            parser.error(f"no default.nix at {root}")
+        env = stack.enter_context(cache.session(root))
+        lock = root / "mango.lock"
+        harness = resolve(read_lock(lock), env=env) if lock.exists() else ROOT
+        command = invocation(harness, argv)
+    else:
+        args, extra = parser.parse_known_args(argv)
+        root = args.environment.resolve()
+        if not (root / "default.nix").is_file():
+            parser.error(f"no default.nix at {root}")
+        if args.action == "lock" and extra:
+            parser.error(
+                "lock takes no additional arguments; edit mango.lock to upgrade"
+            )
+        workspace = (args.workspace or root.parent / "build" / root.name).resolve()
+        if workspace.is_relative_to(root) or root.is_relative_to(workspace):
+            parser.error("workspace must be separate from the environment")
+        env = stack.enter_context(cache.session(root))
+        pin = ensure_lock(root)
+        harness = resolve(pin, env=env)
+        if args.action == "lock":
+            print(
+                json.dumps(
+                    {"lock": str(root / "mango.lock"), "harness": str(harness)}
+                )
+            )
+            return
+        steps = {
+            "load": ["fetch", "load"],
+            "compose": ["fetch", "load", "compose"],
+            "run": ["fetch", "load", "run"],
+        }.get(args.action, [args.action])
+        command = invocation(
+            harness, [str(root), str(workspace), args.action, extra], steps
+        )
+    raise SystemExit(subprocess.run(command, env=env).returncode)
 
 if __name__ == "__main__":
     main()
