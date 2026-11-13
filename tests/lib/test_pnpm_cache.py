@@ -7,7 +7,6 @@ import json
 import os
 import re
 import shutil
-import stat
 import subprocess
 import tempfile
 import unittest
@@ -137,36 +136,14 @@ class PnpmCache(unittest.TestCase):
         self.rejected(self.cache(pnpm="pkgs.pnpm_11", extra="fetcherVersion = 3;") + ".drvPath", "fetcherVersion")
 
 
-REAL_YQ = shutil.which("yq")
-SHIM = """#!/usr/bin/env python3
-import json, subprocess, sys, yaml
-*opts, flt, path = sys.argv[1:]
-data = "\\n".join(json.dumps(document) for document in yaml.safe_load_all(open(path)))
-sys.exit(subprocess.run(["jq", *opts, flt], input=data, text=True).returncode)
-"""
-
-
-@unittest.skipUnless(shutil.which("jq"), "jq required")
 class PnpmInputChecks(unittest.TestCase):
-    """Runs the generated input-check script (no network).
-
-    Uses the real python `yq` from PATH when present (nix-shell -p yq jq); only when absent does it
-    fall back to a PyYAML-backed stand-in, and `USING_REAL_YQ` records which was used.
-    """
-
-    USING_REAL_YQ = REAL_YQ is not None
+    """Runs the generated input-check script with the shell's pinned Python yq."""
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name) / "src"
         self.root.mkdir()
-        shim = Path(self.tmp.name) / "bin" / "yq"
-        shim.parent.mkdir()
-        if not REAL_YQ:
-            shim.write_text(SHIM.replace("#!/usr/bin/env python3", f"#!{shutil.which('python3')}"))
-            shim.chmod(shim.stat().st_mode | stat.S_IXUSR)
-        self.shimdir = shim.parent
         self.write("package.json", "{}")
         self.write("pnpm-lock.yaml", "lockfileVersion: '9.0'\npackages:\n  a@1.0.0:\n    resolution: {integrity: sha512-xx}\n")
 
@@ -187,7 +164,7 @@ class PnpmInputChecks(unittest.TestCase):
         script = re.sub(r"/nix/store/[a-z0-9]{32}-python3-[^/\s]*-env/bin/python3", shutil.which("python3"), script)
         out = Path(self.tmp.name) / "out"
         shutil.rmtree(out, ignore_errors=True)
-        env = {**os.environ, "out": str(out), "PATH": f"{self.shimdir}:{os.environ['PATH']}"}
+        env = {**os.environ, "out": str(out)}
         return subprocess.run(["bash", "-c", script], capture_output=True, text=True, env=env), out
 
     def test_accepts_registry_lock(self):

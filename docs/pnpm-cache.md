@@ -153,10 +153,12 @@ stores. Git-sourced or `file:` dependencies would be rejected.
 
 ## Tests and remote validation
 
-Local (no network, no builds): `nix-shell -p yq jq --run 'nix-shell --run "python -m unittest tests.lib.test_pnpm_cache"'`
-(evaluation tests plus the generated input-check script run against fixtures). The script
-tests use the **real python `yq` 3.4.3** from `PATH` (the same attribute, `pkgs.yq`, the pinned
-helper uses) and fall back to a PyYAML stand-in only when no `yq` is on `PATH`. The strict-YAML
+Local: `nix-shell --run 'python -m unittest tests.lib.test_pnpm_cache'`
+(evaluation tests plus the generated input-check script run against fixtures).
+The shell pins Python `yq` and `jq` using the same Nixpkgs attributes as the adapter,
+so tests do not depend on a host-installed `yq` implementation or a stand-in.
+After the shell dependencies are available, these checks require no network or builds.
+The strict-YAML
 step runs with the shell's PyYAML instead of its own store python. Not covered locally: the
 FOD build, a real pnpm, a real registry, `preparePnpmStore` execution.
 

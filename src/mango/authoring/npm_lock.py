@@ -173,9 +173,11 @@ HARD_LIMITS = {
 }
 DEFAULT_TIMEOUT = 1800
 MAX_TIMEOUT = 3600
-PROGRESS: Callable[[str], None] = lambda message: print(
-    message, file=sys.stderr, flush=True
-)
+def _default_progress(message: str) -> None:
+    print(message, file=sys.stderr, flush=True)
+
+
+PROGRESS: Callable[[str], None] = _default_progress
 
 
 class ResolverError(ValueError):

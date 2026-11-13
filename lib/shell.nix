@@ -15,6 +15,8 @@ in pkgs.mkShell {
     (pkgs.python313.withPackages (p: [ p.pyyaml p.pydantic p.zstandard harbor ]))
     n2c.skopeo
     pkgs.ruff
+    pkgs.jq
+    pkgs.yq
     pkgs.gitMinimal
     pkgs.util-linux
     (command "mango" "mango")
