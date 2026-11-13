@@ -1,11 +1,9 @@
-# Mango 🥭
+# Mango 🥭: A Declarative System for Reproducible Containers
 
 Mango is a declarative DSL for RL environments, and a drop-in replacement for
 Dockerfiles. Declare an environment once: Mango freezes every input it
 depends on and builds it offline from then on. Environments run as ordinary
 [Harbor](https://github.com/harbor-framework/harbor) tasks.
-
-**[Read the documentation →](https://incalmo.github.io/mango/)**
 
 - **Reproducible.** Base images, distro packages and language dependencies are
   pinned by content hash. An environment built next year contains the same
@@ -163,32 +161,6 @@ workspace, its Docker images and the cached build results nothing else uses.
 
 The resulting environment is three things you commit: `default.nix`,
 `inputs.lock.json` and `mango.lock`, next to the unchanged `task/`.
-
-## Documentation
-
-The docs are published at **<https://incalmo.github.io/mango/>**, with search
-and a Dockerfile-versus-Mango page for each of 20 languages. To preview
-changes locally:
-
-```sh
-nix-shell docs.nix --run 'mkdocs serve'
-```
-
-Good starting points:
-
-- [Languages](docs/languages/index.md): a Dockerfile and its Mango equivalent
-  for Python, JavaScript, Java, C#, Go, Rust and 14 more.
-- [How it works](docs/how-it-works.md): author online once, build offline.
-- [Record and replay](docs/record-replay.md): lock any package manager by
-  recording what its build downloads.
-- [Declarative environments](docs/declarative-environments.md): `mkEnvironment`,
-  services, verifiers and the `mango` commands.
-- [Authoring tools](docs/authoring-tools.md): the `mango-pin-*` and
-  `mango-lock-*` commands.
-- [Managed builder and cleanup](docs/managed-builder.md) and
-  [remote binary caches](docs/remote-cache.md).
-
-Mango currently builds `linux/amd64` images on x86_64 Linux.
 
 ## License
 
