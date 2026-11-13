@@ -45,7 +45,7 @@ class LauncherTests(unittest.TestCase):
             ) as run,
         ):
             with self.assertRaises(SystemExit) as result:
-                launcher.main(["load", str(self.root)])
+                launcher.main(["load", str(self.root), "--builder", "host"])
         self.assertEqual(result.exception.code, 0)
         command = run.call_args.args[0]
         self.assertEqual(
@@ -115,7 +115,7 @@ class LauncherTests(unittest.TestCase):
         ):
             with self.assertRaises(SystemExit):
                 launcher.main(
-                    ["run", str(self.root), "--agent", "oracle", "--", "--model", "x"]
+                    ["run", str(self.root), "--builder", "host", "--agent", "oracle", "--", "--model", "x"]
                 )
         commands = [
             shlex.split(part) for part in run.call_args.args[0][-1].split(" && ")

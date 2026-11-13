@@ -3,7 +3,8 @@
   outputs = { self }: let
     pkgs = import (import ./lib/pins/nixpkgs.nix) { system = "x86_64-linux"; };
     launcher = pkgs.writeShellScriptBin "mango" ''
-      exec ${pkgs.python3}/bin/python3 ${./.}/src/mango/launcher.py "$@"
+      export PYTHONPATH=${./.}/src''${PYTHONPATH:+:$PYTHONPATH}
+      exec ${pkgs.python3}/bin/python3 -m mango "$@"
     '';
   in {
     lib.mkHarness = import ./default.nix;

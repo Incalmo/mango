@@ -76,7 +76,7 @@ class CacheTests(unittest.TestCase):
 
     def test_launcher_applies_cache_to_resolution_and_build_without_token(self):
         self.config()
-        for args in (["load", str(self.root)], [str(self.root), "fetch"]):
+        for args in (["load", str(self.root), "--builder", "host"], [str(self.root), "fetch"]):
             with (
                 patch.dict(os.environ, {"MANGO_TEST_TOKEN": "private-token", "NIX_CONFIG": "sandbox = true"}),
                 patch.object(launcher, "resolve", return_value=Path("/locked")) as resolve,

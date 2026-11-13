@@ -8,6 +8,8 @@ Docker Compose file. The environment expression accepts `{ harness }` and return
 Optional `mango.toml` beside `default.nix` selects an authenticated remote binary
 cache for the launcher. See [Remote binary caches](remote-cache.md) for Google
 IAM and customer-token configuration, including Nix daemon trust requirements.
+`mango load` uses the [managed Docker builder](managed-builder.md) by default;
+`--builder host` selects an existing host Nix installation.
 
 `mkEnvironment` accepts:
 

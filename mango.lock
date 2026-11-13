@@ -2,7 +2,11 @@
   "version": 1,
   "mango": {
     "url": "https://github.com/Incalmo/mango.git",
-    "rev": "439273431a88730e1579ee2bdc050dcb8dcad56a",
-    "narHash": "sha256-yiWBXxSkFz2HmOAEzdne3v9oAkMtzTgckYqsKNoBMds="
+    "rev": "57ac6e39b7144fc9565fd25fc14b075583f8f25d",
+    "narHash": "sha256-WfsyjJFEPEjAJ+fqoSg3LWzefW7bDtpQsoM/3BGx23c="
+  },
+  "builder": {
+    "image": "nixos/nix@sha256:c39fc2f168d84ad70cb07102dd82cc73dfb0915bd609308d1d269030bbfa7a26",
+    "platform": "linux/amd64"
   }
 }

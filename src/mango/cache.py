@@ -85,12 +85,14 @@ def daemon_trusts_client():
 
 
 @contextlib.contextmanager
-def session(root: Path):
+def session(root: Path, *, check_trust=True, inherit_config=True):
     config = read_config(root)
     if config is None:
         yield None
         return
     env = dict(os.environ)
+    if not inherit_config:
+        env.pop("NIX_CONFIG", None)
     if config["auth"] == "token":
         token = env.pop(config["token_env"], "")
         if not token or any(char.isspace() for char in token):
@@ -104,7 +106,7 @@ def session(root: Path):
     tokens = Tokens(config["url"], fetch=fetch)
     # Fail clearly before starting a build if credentials are missing.
     tokens()
-    if daemon_trusts_client() is False:
+    if check_trust and daemon_trusts_client() is False:
         log.warning(
             "The Nix daemon does not trust this user; it will ignore Mango's "
             "per-task cache settings. Use a builder whose Nix store trusts "

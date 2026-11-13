@@ -4,6 +4,8 @@ Put `mango.toml` beside an environment's `default.nix` and `mango.lock`.
 The Mango launcher reads it before resolving the pinned harness and keeps the
 cache available throughout `mango load`, `fetch`, `build`, and other commands.
 Both command-first and legacy environment-first invocations support it.
+Command-first invocations use the [managed builder](managed-builder.md) by
+default, so the customer's host Nix daemon does not control cache trust.
 Use an updated launcher; older launchers do not read this file. The harness
 revision in `mango.lock` does not need to change to enable cache access.
 
@@ -52,11 +54,12 @@ the invocation exits. Existing Nix configuration is preserved, and cache
 settings are added for this invocation. A missing cached path builds normally;
 authentication rejections are reported and treated as cache misses.
 
-## Nix daemon trust
+## Host backend: Nix daemon trust
 
-An environment file cannot grant itself trust in a system Nix daemon. This
+With `--builder host` or a legacy environment-first invocation, an environment
+file cannot grant itself trust in a system Nix daemon. This
 integration works with a local store or a daemon that trusts the invoking user.
 Otherwise Nix may ignore the dynamic loopback substituter and its public key.
 Mango does not modify host Nix configuration or disable signature checking.
-A managed builder must configure that trust itself. The image-building QEMU
-VM is not a replacement for the host Nix daemon.
+The default managed builder configures trust in its own private store instead.
+The image-building QEMU VM alone is not a replacement for a host Nix daemon.

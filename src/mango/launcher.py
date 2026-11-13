@@ -13,7 +13,7 @@ import sys
 from contextlib import ExitStack
 from pathlib import Path
 
-from mango import cache
+from mango import builder, cache
 
 ROOT = Path(__file__).resolve().parents[2]
 ACTIONS = {
@@ -120,20 +120,21 @@ def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="mango",
         description="Build and load an environment using its mango.lock.",
-        epilog="Legacy `mango ENV ACTION ...` remains supported. Nix is required.",
+        epilog="Managed builds require local rootful Docker with privileged containers. --builder host uses host Nix. Legacy `mango ENV ACTION ...` uses host Nix.",
     )
     parser.add_argument("action", choices=sorted(ACTIONS | {"lock"}))
     parser.add_argument("environment", type=Path)
     parser.add_argument("--workspace", type=Path)
+    parser.add_argument("--builder", choices=("container", "host"), default="container")
     try:
         with ExitStack() as stack:
             return launch(argv, parser, stack)
-    except (OSError, ValueError, subprocess.SubprocessError) as error:
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
         parser.exit(1, f"mango: {error}\n")
 
 
 def launch(argv, parser, stack):
-    if argv and argv[0] not in ACTIONS | {"lock", "--help", "-h"}:
+    if argv and not argv[0].startswith("-") and argv[0] not in ACTIONS | {"lock"}:
         # Preserve the old CLI's flags and semantics, but select its harness
         # from the environment lock when one exists.
         root = Path(argv[0]).resolve()
@@ -155,8 +156,10 @@ def launch(argv, parser, stack):
         workspace = (args.workspace or root.parent / "build" / root.name).resolve()
         if workspace.is_relative_to(root) or root.is_relative_to(workspace):
             parser.error("workspace must be separate from the environment")
-        env = stack.enter_context(cache.session(root))
         pin = ensure_lock(root)
+        if args.builder == "container":
+            return builder.run(root, workspace, args.action, extra, pin)
+        env = stack.enter_context(cache.session(root))
         harness = resolve(pin, env=env)
         if args.action == "lock":
             print(
