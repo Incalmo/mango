@@ -56,6 +56,7 @@ class LauncherTests(unittest.TestCase):
         self.assertEqual(load[-1], "load")
         self.assertEqual(fetch[:-1], load[:-1])
         self.assertEqual(fetch[3], str(self.root))
+        self.assertEqual(fetch[5], str(self.root.parent / "mango-build" / self.root.name))
         self.assertEqual(fetch[2], "from mango.cli import main; main()")
 
     def test_legacy_form_keeps_flags_and_selects_lock(self):

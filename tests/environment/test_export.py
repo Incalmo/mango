@@ -17,6 +17,27 @@ from mango.runtime.materialize import verifier_environments
 from tests.support import separate_grader_toml
 
 
+class SourceExportTests(unittest.TestCase):
+    def test_authored_build_and_result_names_survive_export(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "source"
+            root.mkdir()
+            paths = ["build/package-runtime.py", "nested/build/input", "result", "result-data/value"]
+            for name in paths:
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(name)
+            (root / "mango-build").mkdir()
+            (root / "mango-build/images.json").write_text("generated")
+            (root / "result-nix").symlink_to("/nix/store/missing-generated-output")
+            destination = Path(temporary) / "export"
+            export_source(root, destination)
+            for name in paths:
+                self.assertEqual((destination / "environment" / name).read_text(), name)
+            self.assertFalse((destination / "environment/mango-build").exists())
+            self.assertFalse((destination / "environment/result-nix").is_symlink())
+
+
 class ExportTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
@@ -32,7 +53,7 @@ class ExportTests(unittest.TestCase):
         self.root = Path(self.directory.name) / "bundle"
         export_source(self.source, self.root)
         self.bundle = self.root / "environment"
-        self.state = self.root / "build/environment"
+        self.state = self.root / "mango-build/environment"
         self.state.mkdir(parents=True)
         app = load_manifest(self.bundle, REPO)
         self.attributes = list(app.attributes.values())

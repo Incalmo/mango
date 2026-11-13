@@ -61,7 +61,7 @@ replacing the workspace's runtime task. A failed build or image import keeps
 the previous runtime intact. Temporary archives and containers are removed;
 the named Nix volume survives.
 
-Generated tasks remain at `../build/<environment-name>/runtime` by default;
+Generated tasks are at `../mango-build/<environment-name>/runtime` by default;
 `--workspace /path` chooses a different workspace. Paths must be outside
 `/nix` and cannot contain commas (Docker mount syntax).
 

@@ -65,6 +65,28 @@ def inspect(image):
 
 
 class Containers(unittest.TestCase):
+    def test_layers_retain_the_bytes_their_digests_describe(self):
+        image = build('c { name="retained-layer"; files."/app/data".text="application output"; }')
+        layers = json.loads(image.read_text())["layers"]
+        self.assertTrue(layers)
+        for layer in layers:
+            blob = Path(layer["layer-path"])
+            data = blob.read_bytes()
+            self.assertEqual(layer["digest"], "sha256:" + hashlib.sha256(data).hexdigest())
+            self.assertEqual(layer["size"], len(data))
+        # Model another builder having different bytes at a dependency path.
+        # Export must read the retained blob, not rewalk the source paths.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "changed").write_text("different realization")
+            document = json.loads(image.read_text())
+            for layer in document["layers"]:
+                layer["paths"] = [{"path": str(root / "changed")}]
+            cached = root / "cached-image.json"
+            cached.write_text(json.dumps(document))
+            _, _, contents, _ = inspect(cached)
+            self.assertEqual(contents["app/data"], b"application output")
+
     def test_scratch_root_account_and_explicit_override(self):
         image = build('c { name="scratch-root-account"; }')
         config, entries, contents, _ = inspect(image)

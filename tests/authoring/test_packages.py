@@ -4,6 +4,7 @@ import hashlib
 import io
 import json
 import os
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -191,6 +192,29 @@ class PackageLockTests(unittest.TestCase):
             packages.apk_script(request(manager='apk', sources=()))
         with self.assertRaisesRegex(LockError, 'apt release'):
             packages.apk_script(request(manager='apk'))
+
+    def test_apk_transaction_parser_handles_v3_padding_and_rejects_unknown_actions(self):
+        req = request(manager='apk', sources=('https://dl.test/main',),
+                      stages=(PackageStage(packages=('example',)),))
+        script = packages.apk_script(req)
+        parser = script.split("awk '\n", 1)[1].split("' /tmp/mango-apk-0/transaction", 1)[0]
+        transaction = ('( 1/12) Installing libmnl (1.0.5-r2)\n'
+                       '(10/12) Installing iproute2 (6.17.0-r0)\n'
+                       '(11/12) Upgrading example (1-r0 -> 2-r0)\n'
+                       '(12/12) Reinstalling existing (3-r0)\nOK: 20 MiB\n')
+        result = subprocess.run(['awk', parser], input=transaction, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout.splitlines(), ['libmnl=1.0.5-r2', 'iproute2=6.17.0-r0',
+                                                     'example=2-r0', 'existing=3-r0'])
+        for unexpected in ['( 1/1) Purging example (1-r0)', 'Installing example (1-r0)']:
+            with self.subTest(unexpected=unexpected):
+                result = subprocess.run(['awk', parser], input=unexpected+'\n', capture_output=True, text=True)
+                self.assertNotEqual(result.returncode, 0)
+        cache = packages._cache_path(req)
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.write_text(json.dumps({'resolver_version': 2, 'request': req.cache_document(),
+                                     'stages': [[]]}))
+        self.assertIsNone(packages._read_cache(req))
 
 
 if __name__ == "__main__":

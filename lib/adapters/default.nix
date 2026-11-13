@@ -142,6 +142,7 @@ PYTHON
       "npm dependencies require credential-free HTTP(S) URLs and integrity hashes; Git/workspace dependencies are not supported yet";
       pkgs.importNpmLock { inherit package; packageLock = lock; fetcherOpts = options; };
   npmConfigHook = pkgs.importNpmLock.npmConfigHook;
+  importNpmCacheArchive = import ./npm-cache-archive.nix { inherit pkgs; };
   fetchAptCache = { artifacts, name ? "apt-archives" }:
     assert lib.assertMsg (builtins.all (r: lib.hasSuffix ".deb" r.path && !lib.hasInfix "/" r.path) artifacts)
       "apt cache requires flat .deb filenames";

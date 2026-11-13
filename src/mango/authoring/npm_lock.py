@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """Resolve an npm project's registry tarballs to a hash-verified inventory, REMOTE HOST ONLY.
 
-Authoring-time resolver for ``npm ci`` projects. Its output feeds Mango's runtime
+Authoring-time resolver for ``npm ci`` and lockless ``npm install`` projects. Its output feeds Mango's runtime
 *offline* build; it does not translate or reproduce the original image. Run it only
 on the remote authoring host with ``MANGO_REMOTE_AUTHOR=1`` and Docker there.
-Nothing here may be run on a developer machine.
+Container/network resolution belongs on that remote host; pure parsing and tests
+do not require Docker.
 
 Supported subset (everything else is rejected, never approximated)
- - manager ``npm`` only, ``command: "ci"`` only, version already in the base and
+ - manager ``npm`` only, ``command: "ci"`` or lockless ``"install"``, version already in the base and
    equal to the request's exact version. ``pnpm`` and ``yarn`` are refused with
    reason ``unsupported-manager`` (see "Limits").
  - ``package-lock.json`` / ``npm-shrinkwrap.json`` content, lockfileVersion 2 or 3.
@@ -82,7 +83,8 @@ Package selection, generated lock and source manifest must remain unchanged.
 The manager-created cache (including registry metadata) is then retained as a
 hash-checked source archive; this is dependency state, not an environment image.
 
-Results are checkpointed after every request, in the style of remote_go_deps.py.
+Results are checkpointed after every request. Public Python API: ``resolve`` and
+``require_verified``; CLI: ``python -m mango.authoring.npm_lock``.
 """
 
 from __future__ import annotations
@@ -104,7 +106,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Self
 
-RESOLVER_VERSION = "node-deps-1"
+RESOLVER_VERSION = "node-deps-2"
 REQUEST_KEYS = {
     "id",
     "base",
@@ -173,11 +175,10 @@ HARD_LIMITS = {
 }
 DEFAULT_TIMEOUT = 1800
 MAX_TIMEOUT = 3600
-def _default_progress(message: str) -> None:
+
+
+def PROGRESS(message: str) -> None:
     print(message, file=sys.stderr, flush=True)
-
-
-PROGRESS: Callable[[str], None] = _default_progress
 
 
 class ResolverError(ValueError):
@@ -1168,7 +1169,13 @@ def resolve(
     sources = load_sources(request)
     install_mode = request["command"] == "install"
     if install_mode:
-        check_manifest(sources)  # the lock does not exist yet; analysed once generated
+        manifest = check_manifest(sources)
+        if not isinstance(manifest.get("name"), str) or not manifest["name"]:
+            raise ResolverError(
+                "Lockless npm install requires an explicit project name; "
+                "otherwise npm derives generated lock metadata from the authoring directory",
+                "project-name",
+            )
         analysis = None
     else:
         analysis = analyze_lock(sources, request["limits"])

@@ -45,7 +45,7 @@ class Failure(Exception):
 
 def state_dir(root):
     """Where everything generated for the environment at ``root`` goes."""
-    return root.resolve().parent / "build" / root.name
+    return root.resolve().parent / "mango-build" / root.name
 
 
 def instantiate(root, attributes):
@@ -165,9 +165,19 @@ def export_source(root, destination):
         raise ValueError(
             "Export destination must be outside the harness and environment"
         )
-    ignored = shutil.ignore_patterns(
-        "__pycache__", ".git", ".jj", ".direnv", "result", "result-*", "build"
+    metadata = shutil.ignore_patterns(
+        "__pycache__", ".git", ".jj", ".direnv", "mango-build"
     )
+
+    def ignored(directory, names):
+        skipped = set(metadata(directory, names))
+        for name in names:
+            path = Path(directory) / name
+            if (name == "result" or name.startswith("result-")) and path.is_symlink():
+                if path.resolve().is_relative_to("/nix/store"):
+                    skipped.add(name)
+        return skipped
+
     shutil.copytree(root, destination / "environment", ignore=ignored)
     for name in ("lib", "src", "builders"):
         shutil.copytree(HARNESS / name, destination / name, ignore=ignored)
@@ -457,7 +467,7 @@ def execute(args, root, declared, work, verifier_images):
         (destination / "offline-paths.json").write_text(
             json.dumps(retained, indent=2) + "\n"
         )
-        target_work = destination / "build" / "environment"
+        target_work = destination / "mango-build" / "environment"
         target_work.mkdir(parents=True)
         # Only explicit receipts/output links: never trial logs or secrets.
         shutil.copy2(receipt, target_work / "inputs.json")

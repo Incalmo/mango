@@ -10,3 +10,4 @@ result-*
 
 .ruff_cache/
 *.egg-info/
+mango-build/

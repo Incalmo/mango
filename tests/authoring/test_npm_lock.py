@@ -824,6 +824,14 @@ def install_hidden() -> dict:
 
 
 class LocklessInstallTests(unittest.TestCase):
+    def test_generated_metadata_cannot_infer_project_name_from_authoring_cwd(self):
+        manifest = dict(INSTALL_MANIFEST)
+        manifest.pop("name")
+        with remote(), self.assertRaises(deps.ResolverError) as caught:
+            resolve(install_request(files={"package_json": json.dumps(manifest)}))
+        self.assertEqual(caught.exception.code, "project-name")
+        self.assertEqual(FakeContainer.instances, [])
+
     def test_generated_lock_is_captured_and_selection_matches(self) -> None:
         generated = generated_lock_bytes()
         with remote(hidden=install_hidden(), generated_lock=generated):

@@ -10,7 +10,7 @@ store_root=$(realpath "$store_root")
 if [[ -n "${3:-}" ]]; then
   # A standard binary cache replaces the archive transport. No build/evaluation
   # occurs during restore, so a missing object cannot trigger an upstream fetch.
-  python - "$bundle"/build/*/inputs.json "$store_root" "$3" "${4:?trusted public key}" <<'RESTORE'
+  python - "$bundle"/mango-build/*/inputs.json "$store_root" "$3" "${4:?trusted public key}" <<'RESTORE'
 import json, subprocess, sys
 from pathlib import Path
 paths = json.load(open(sys.argv[1]))['paths']
@@ -24,7 +24,7 @@ RESTORE
 else
   nix-store --store "local?root=$store_root" --import < "$bundle/inputs.nar" > "$store_root/imported-paths.txt"
 fi
-python - "$bundle"/build/*/inputs.json "$store_root" <<'PY'
+python - "$bundle"/mango-build/*/inputs.json "$store_root" <<'PY'
 import json, subprocess, sys
 from pathlib import Path
 root = Path(sys.argv[2])
