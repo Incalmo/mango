@@ -110,3 +110,17 @@ in [Agent authoring](agent-authoring.md). The harness does not scan task files,
 inspect upstream repositories or discover dependencies. Explicit native-lock readers are supported. Other ecosystem
 helpers are optional layout utilities; the agent owns completeness and all
 package-manager-specific preparation commands.
+
+## pnpm store inputs
+
+`dependencies.fetchPnpmCache`, `dependencies.fetchPnpmTool`, and
+`dependencies.preparePnpmStore` support explicit pnpm project inputs and an exact
+provided pnpm version. See [pnpm cache inputs](pnpm-cache.md) for the supported
+store layouts, workspace inventory, and original-target offline validation steps.
+The adapter's evaluation and input checks do not establish that a particular
+application builds offline; that requires its real toolchain and build commands.
+
+## Composer cache inputs
+
+`dependencies.fetchComposerCache` lays out pinned Composer dist archives at their
+observed cache paths. See [Composer cache inputs](composer-cache.md).

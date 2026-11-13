@@ -4,6 +4,8 @@
   jarNormalizer = ../builders/normalize_jar.py;
   jksTrustStoreNormalizer = ../builders/normalize_jks.py;
   stageDebsScript = ../builders/stage-debs.sh;
+  installDebsScript = ../builders/install-debs.sh;
+  restoreAptIndexesScript = ../builders/restore-apt-indexes.sh;
   pinnedImage = import ./images/pinned-image.nix { inherit pkgs; };
   pinnedFilesScript = ../builders/pinned_files.py;
   pinnedFiles = pkgs.writeShellApplication {

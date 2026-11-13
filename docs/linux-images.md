@@ -11,6 +11,13 @@ An author can use `pkgs.lib.fakeHash` once to obtain the expected hash, review i
 then commit the real hash. Retain the resulting store object in the binary cache.
 Do not resolve tags during a customer rebuild.
 
+Optional `mirrors = [ "mirror.gcr.io/library/python" ];` supplies alternate
+repository names, without tags or digests. The fetcher tries these in order,
+then `image`, always with the same `digest` and expected `hash`. Failed copies
+are removed before the next attempt. The default empty list retains the direct
+fetch behavior. Authors must verify that each mirror serves the pinned manifest;
+mirrors never authorize a newer tag or different image content.
+
 For parallel hash discovery, pass a unique `name`, for example
 `name = "probe-ubuntu-${builtins.substring 7 12 digest}"`. Otherwise different
 fake-hash fetches share the default `linux-base` output path and serialize on
@@ -20,6 +27,11 @@ path. Naming does not change the fetched bytes or their recursive hash.
 `mkLinuxImage` takes these explicit arguments:
 
 Input files and context are materialized as separate immutable store objects.
+Context symlinks are preserved. For inputs, structural directories in a link farm
+are traversed until an absolute Nix-store reference is found. That referenced
+file or directory is copied once, preserving its nested symlinks. Runtime links
+such as `/bin/sh` are never followed on the builder. A dependency cache that is
+itself a farm should be materialized explicitly before passing it as one payload.
 Changing only `buildScript` reuses those objects rather than copying the entire
 download inventory into a new cache object. During the VM build, the script,
 files and context are mounted individually read-only under `/.nix-inputs`;
@@ -34,6 +46,7 @@ once when adopting the helper, so rerun the affected qualification checks.
 | `inputs` | Store directory, usually from `dependencies.fetchLockedInputs` |
 | `context` | Explicitly selected source/configuration directory |
 | `buildScript` | Shell script authored for this distro |
+| `buildSteps` | Alternative ordered commands with per-command `env`, `workdir`, and temporary `mounts`; specify exactly one of `buildScript` and `buildSteps` |
 | `buildEnv` | Build-only environment variables; defaults to an empty set |
 | `config` | Runtime OCI configuration overrides; defaults to an empty set |
 | `cores` | Explicit VM CPU count, integer 1–255; default 1. Never inferred from the host |
@@ -41,15 +54,64 @@ once when adopting the helper, so rerun the affected qualification checks.
 | `exportPaths` | Absolute paths to export as a separate `.artifacts` tar; defaults to `[]` |
 | `sourceDateEpoch` | Timestamp for new layer entries and build `SOURCE_DATE_EPOCH`; defaults to 1 |
 | `isolation` | `"vm"` (default): a QEMU VM. `"namespace"`: the Nix sandbox itself, no VM; see below |
+| `acceleration` | VM accelerator: `"auto"` (default) tries KVM then TCG; `"kvm"` requires hardware acceleration; `"tcg"` forces software emulation |
 
 The script runs as root using the base's `/bin/sh` in a QEMU Linux VM with no
 network device. Loopback is enabled for local service tests; a guard rejects a
 VM that has any other interface.
 
-## Without KVM: `isolation = "namespace"`
+For temporary source mounts, use ordered steps. Mount paths are absolute paths
+inside the build root, including staged inputs under `/.nix-inputs`. The kernel
+enforces read-only writes through each target; the source retains its original
+permissions. Existing target contents reappear after the command, including on
+failure. Missing target placeholders are removed. Mounts cannot overlap their
+sources, escape the build root through symlinks, or cover runtime/input mounts.
 
-A VM build needs the `kvm` system feature for practical speed (on a cloud VM,
-nested virtualization). With `isolation = "namespace"` the same build runs in
+```nix
+buildSteps = [
+  { command = "mkdir -p /work; cp -R /.nix-inputs/context/. /work/"; }
+  {
+    command = "./verify-source /observed";
+    workdir = "/work";
+    mounts = [{ source = "/work"; target = "/observed"; readOnly = true; }];
+  }
+];
+```
+
+Each command starts a fresh shell; persist files or pass explicit `env` values
+between steps. This API does not provide network access or dependency discovery.
+Set `readOnly = false` explicitly for a writable cache mount. Writes then persist
+in its source directory across commands, while the covered target is restored.
+Remove temporary cache source directories in a final step to exclude them from
+the resulting image.
+
+## Automatic VM acceleration
+
+The default VM build uses QEMU's `accel=kvm:tcg`. QEMU attempts to initialize
+KVM inside the actual Nix build sandbox and uses software emulation (TCG) if
+that fails. This handles missing devices, permission restrictions and cloud
+machines without nested virtualization. The check runs on the builder, which
+may be different from the machine invoking Mango. No Nix daemon reconfiguration
+or `uid-range` feature is required for the VM path.
+
+Automatic and software-only derivations do not require Nix's `kvm` system
+feature. Software emulation is substantially slower, especially for compilation.
+Use `acceleration = "tcg"` to test that path on a machine with KVM, or
+`acceleration = "kvm"` to require a hardware-accelerated builder. The choice is
+an explicit build input when forced; auto mode does not depend on host detection
+during Nix evaluation. A guest build failure is never retried in another mode.
+
+The real-VM regression test builds the same layer in automatic and forced TCG
+mode and compares the bytes. It also masks KVM in a private user/mount namespace
+to verify automatic fallback without changing the host:
+
+```sh
+nix-shell --run 'RUN_LINUX_VM_TESTS=1 python -m unittest tests.lib.test_vm_acceleration -v'
+```
+
+## Optional namespace builds: `isolation = "namespace"`
+
+With `isolation = "namespace"` the same build runs in
 the Nix sandbox instead: root inside a user namespace mapped over 65536 uids,
 so installers can create service users and `chown` to them, in the sandbox's
 private network namespace with only loopback. It runs the same `rootfs.py`

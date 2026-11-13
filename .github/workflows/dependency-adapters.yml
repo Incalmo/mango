@@ -17,5 +17,16 @@ jobs:
             sandbox = true
             sandbox-fallback = false
       - run: nix-shell --run 'python -m unittest discover -s tests -t . -p "test_*.py" -v'
-      - run: nix-shell --run 'bash tests/support/check-cache-offline-fixture.sh'
+      - name: Verify offline rebuild in an isolated store
+        run: |
+          # Ubuntu's AppArmor policy blocks the Nix-provided unshare binary.
+          # Allow user namespaces only for this check on the disposable runner;
+          # retain Nix sandboxing and the fixture's network namespace isolation.
+          key=kernel.apparmor_restrict_unprivileged_userns
+          if [[ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]]; then
+            previous=$(sysctl -n "$key")
+            trap 'sudo sysctl -w "$key=$previous"' EXIT
+            sudo sysctl -w "$key=0"
+          fi
+          nix-shell --run 'unshare -Urnm true && bash tests/support/check-cache-offline-fixture.sh'
       - run: nix-shell --run 'ruff check src builders tests'

@@ -15,12 +15,17 @@ in pkgs.mkShell {
     (pkgs.python313.withPackages (p: [ p.pyyaml p.pydantic p.zstandard harbor ]))
     n2c.skopeo
     pkgs.ruff
+    pkgs.jq
+    pkgs.yq
     pkgs.gitMinimal
     pkgs.util-linux
     (command "mango" "mango")
     (command "mango-pin-base" "mango.authoring.pin_base")
     (command "mango-pin-source" "mango.authoring.pin_source")
+    (command "mango-pin-file" "mango.authoring.pin_file")
     (command "mango-lock-packages" "mango.authoring.packages")
+    (command "mango-lock-python" "mango.authoring.python_lock")
+    (command "mango-lock-rustup" "mango.authoring.rustup_lock")
   ];
   shellHook = ''
     export PYTHONPATH=${source}''${PYTHONPATH:+:$PYTHONPATH}

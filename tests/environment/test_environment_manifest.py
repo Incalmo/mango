@@ -21,6 +21,21 @@ from tests.support import write_recipe
 
 
 class EnvironmentManifestTests(unittest.TestCase):
+    def test_compose_service_keys_allow_dots_without_changing_output_names(self):
+        document = {
+            "name": "dotted-services",
+            "images": {"main": "images.main", "egress": "images.egress"},
+            "services": {"main": "main", "quality-db.example.lan": "main"},
+            "verifiers": {"tests": {"main": "main", "rpt-web.example.lan": "main"}},
+        }
+        manifest = EnvironmentManifest.model_validate(document)
+        self.assertIn("quality-db.example.lan", manifest.services)
+        self.assertIn("rpt-web.example.lan", manifest.verifiers["tests"])
+        for invalid in ("../db", "-db", "db/name", "db name"):
+            document["services"] = {"main": "main", invalid: "main"}
+            with self.assertRaises(ValidationError):
+                EnvironmentManifest.model_validate(document)
+
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)

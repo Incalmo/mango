@@ -35,7 +35,7 @@ outputs = subprocess.check_output(
     ["nix-store", "--store", store, "--query", "--outputs", *drvs], text=True
 ).splitlines()
 expected = json.loads(subprocess.check_output(
-    ["nix", "path-info", "--store", store, "--json", *outputs], text=True
+    ["nix", "path-info", "--store", store, "--json", "--json-format", "1", *outputs], text=True
 ))
 if isinstance(expected, list):
     expected = {item["path"]: item for item in expected}
@@ -72,7 +72,7 @@ from pathlib import Path
 root = Path(sys.argv[1])
 expected = json.loads((root / "expected-outputs.json").read_text())
 actual = json.loads(subprocess.check_output(
-    ["nix", "path-info", "--store", "local?root=" + str(root), "--json", *expected], text=True
+    ["nix", "path-info", "--store", "local?root=" + str(root), "--json", "--json-format", "1", *expected], text=True
 ))
 if isinstance(actual, list):
     actual = {item["path"]: item for item in actual}

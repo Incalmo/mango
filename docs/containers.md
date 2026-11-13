@@ -175,3 +175,21 @@ metadata. Output replacement is atomic, including when input equals output.
 This changes archive bytes and requires a new archive hash. Use the same pinned
 Python/zlib toolchain for reproducibility and verify application startup afterward;
 the helper does not repair nondeterministic entry contents or resolve dependencies.
+
+`h.installDebsScript` installs one complete pinned apt transaction while retaining
+apt's manual/automatic package marks:
+
+```sh
+sh /.nix-inputs/files/install-debs.sh /.nix-inputs/files/stage-debs.sh \
+  /.nix-inputs/files/apt/transaction curl ca-certificates
+```
+
+Supply both helper scripts as explicit inputs. The directory must contain every
+`.deb` selected for this transaction; the remaining arguments are its explicitly
+requested package names (optionally `=version`). The helper stages canonical
+archive names in a private writable cache, installs only these local files with
+`--no-download --no-install-recommends`, then restores previously manual packages
+and marks only the requested roots manual. This avoids turning all dependency
+archives into manual roots. It does not resolve dependencies, access repositories,
+select virtual-package providers, or support arbitrary apt installation flags.
+Virtual requests must first be resolved to their actual selected package names.
