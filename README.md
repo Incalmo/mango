@@ -1,4 +1,4 @@
-# Mango 🥭
+# Mango 🥭: A Declarative System for Reproducible Containers
 
 Mango is a declarative DSL for RL environments, and a drop-in replacement for
 Dockerfiles. Declare an environment once: Mango freezes every input it
