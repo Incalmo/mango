@@ -1,5 +1,9 @@
 """Per-environment signed cache access, using only the Python standard library.
 
+An environment's ``mango.toml`` names caches; it never names a credential.
+Credentials belong to the user and are keyed by cache origin in the user's own
+credentials file, so an environment cannot direct a secret to a host.
+
 The read bridge is adapted from incalmo_shared.nix_cache. It keeps authentication
 out of Nix settings and passes signed NAR redirects through without credentials.
 """
@@ -28,10 +32,16 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 log = logging.getLogger(__name__)
+# The standard Nix binary cache layout. A narinfo names its own NAR file, and
+# caches differ (Nix: base32 file hash; Cachix: hex; Attic: store path hash),
+# so accept any single file name under nar/ rather than one hash encoding.
 CACHE_KEY = re.compile(
     r"nix-cache-info|[0-9a-df-np-sv-z]{32}\.narinfo"
-    r"|nar/[0-9a-df-np-sv-z]{52}\.nar(?:\.xz|\.zst|\.bz2|\.br)?"
+    r"|nar/[A-Za-z0-9][A-Za-z0-9._-]{0,254}"
 )
+AUTH_MODES = {"google", "bearer", "basic"}
+CREDENTIALS_ENV = "MANGO_CREDENTIALS"
+GOOGLE_HINT = "you need roles/run.invoker on the cache service"
 PUBLIC_KEY_FORMAT = re.compile(r"[A-Za-z0-9.\-_]+:[A-Za-z0-9+/]{43}=")
 TOKEN_LIFETIME = 45 * 60
 REDIRECTS = (301, 302, 303, 307, 308)
@@ -42,35 +52,90 @@ class CacheError(ValueError):
     pass
 
 
-def read_config(root: Path):
+def read_config(root: Path) -> list[dict]:
+    """The caches an environment declares: ``[[cache]]`` with url and public_key."""
     path = root / "mango.toml"
     if not path.exists():
-        return None
+        return []
     with path.open("rb") as stream:
         document = tomllib.load(stream)
     if set(document) - {"cache"}:
         raise CacheError(f"{path}: unknown Mango configuration section")
-    config = document.get("cache")
-    if config is None:
-        return None
-    allowed = {"url", "public_key", "auth", "token_env"}
-    if not isinstance(config, dict) or set(config) - allowed:
-        raise CacheError(f"{path}: unknown cache setting")
-    if not all(isinstance(config.get(key), str) for key in ("url", "public_key", "auth")):
-        raise CacheError(f"{path}: cache requires url, public_key and auth strings")
-    url = check_endpoint(config["url"])
-    if not url.startswith("https://"):
-        raise CacheError(f"{path}: cache URL must use HTTPS")
-    check_public_key(config["public_key"])
-    if len(base64.b64decode(config["public_key"].split(":")[1], validate=True)) != 32:
-        raise CacheError(f"{path}: invalid cache public key")
-    if config["auth"] == "token":
-        name = config.get("token_env")
-        if not isinstance(name, str) or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name):
-            raise CacheError(f"{path}: token authentication requires token_env")
-    elif config["auth"] != "google" or "token_env" in config:
-        raise CacheError(f"{path}: auth must be token or google; token_env is for token auth only")
-    return {**config, "url": url}
+    caches = document.get("cache", [])
+    if not isinstance(caches, list):
+        raise CacheError(f"{path}: declare each cache as a [[cache]] table")
+    result = []
+    for config in caches:
+        if (
+            not isinstance(config, dict)
+            or set(config) != {"url", "public_key"}
+            or not all(isinstance(value, str) for value in config.values())
+        ):
+            raise CacheError(
+                f"{path}: each [[cache]] takes exactly url and public_key; "
+                f"credentials belong in {credentials_file()}"
+            )
+        url = check_endpoint(config["url"])
+        if not url.startswith("https://"):
+            raise CacheError(f"{path}: cache URL must use HTTPS")
+        check_public_key(config["public_key"])
+        if len(base64.b64decode(config["public_key"].split(":")[1], validate=True)) != 32:
+            raise CacheError(f"{path}: invalid cache public key")
+        if any(url == other["url"] for other in result):
+            raise CacheError(f"{path}: cache {url} is declared twice")
+        result.append({"url": url, "public_key": config["public_key"]})
+    return result
+
+
+def credentials_file() -> Path:
+    if path := os.environ.get(CREDENTIALS_ENV):
+        return Path(path)
+    base = os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config"
+    return Path(base) / "mango" / "credentials.toml"
+
+
+def read_credentials() -> dict[str, dict]:
+    """The user's own credentials: one table per cache origin."""
+    path = credentials_file()
+    try:
+        with path.open("rb") as stream:
+            document = tomllib.load(stream)
+    except FileNotFoundError:
+        return {}
+    result = {}
+    for origin, entry in document.items():
+        if not isinstance(entry, dict) or set(entry) - {"auth", "token_env"}:
+            raise CacheError(f"{path}: [{origin!r}] takes auth and token_env")
+        if entry.get("auth") not in AUTH_MODES:
+            raise CacheError(f"{path}: auth must be google, bearer or basic")
+        name = entry.get("token_env")
+        if entry["auth"] == "google":
+            if name is not None:
+                raise CacheError(f"{path}: token_env is for bearer and basic auth only")
+        elif not isinstance(name, str) or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name):
+            raise CacheError(f"{path}: {entry['auth']} auth requires token_env")
+        result[check_endpoint(origin)] = entry
+    return result
+
+
+def authorization(url: str, entry: dict | None, values: dict[str, str]):
+    """``(tokens, scheme, hint)`` for one cache; fails early on a missing secret."""
+    where = credentials_file()
+    if entry is None:
+        return None, None, f'if it is private, add ["{url}"] to {where}'
+    if entry["auth"] == "google":
+        tokens = Tokens(url, fetch=identity_token)
+        tokens()
+        return tokens, "Bearer", GOOGLE_HINT
+    name = entry["token_env"]
+    token = values[name]
+    if not token or any(char.isspace() for char in token):
+        raise CacheError(f"Set {name} to your access token for {url} (named in {where})")
+    return (
+        Tokens(url, fetch=lambda _audience: token, renewable=False),
+        entry["auth"].capitalize(),
+        f"check that {name} holds a valid, unexpired token for this cache",
+    )
 
 
 def daemon_trusts_client():
@@ -86,36 +151,37 @@ def daemon_trusts_client():
 
 @contextlib.contextmanager
 def session(root: Path, *, check_trust=True, inherit_config=True):
-    config = read_config(root)
-    if config is None:
+    caches = read_config(root)
+    if not caches:
         yield None
         return
+    credentials = read_credentials()
     env = dict(os.environ)
     if not inherit_config:
         env.pop("NIX_CONFIG", None)
-    if config["auth"] == "token":
-        token = env.pop(config["token_env"], "")
-        if not token or any(char.isspace() for char in token):
-            raise CacheError(f"Set {config['token_env']} to your cache access token")
-
-        def fetch(_audience):
-            return token
-
-    else:
-        fetch = identity_token
-    tokens = Tokens(config["url"], fetch=fetch)
-    # Fail clearly before starting a build if credentials are missing.
-    tokens()
-    if check_trust and daemon_trusts_client() is False:
-        log.warning(
-            "The Nix daemon does not trust this user; it will ignore Mango's "
-            "per-task cache settings. Use a builder whose Nix store trusts "
-            "the invoking user. Host configuration has not been changed."
-        )
-    with bridge(config["url"], tokens=tokens) as url:
+    # Secrets stay with the launcher: no child process inherits a cache token.
+    values = {
+        entry["token_env"]: env.pop(entry["token_env"], "")
+        for entry in credentials.values() if "token_env" in entry
+    }
+    with contextlib.ExitStack() as stack:
+        settings = []
+        for config in caches:
+            tokens, scheme, hint = authorization(
+                config["url"], credentials.get(config["url"]), values
+            )
+            url = stack.enter_context(
+                bridge(config["url"], tokens=tokens, scheme=scheme, hint=hint)
+            )
+            settings.append(substituter_config(url, config["public_key"]))
+        if check_trust and daemon_trusts_client() is False:
+            log.warning(
+                "The Nix daemon does not trust this user; it will ignore Mango's "
+                "per-task cache settings. Use a builder whose Nix store trusts "
+                "the invoking user. Host configuration has not been changed."
+            )
         env["NIX_CONFIG"] = (
-            env.get("NIX_CONFIG", "").rstrip("\n") + "\n"
-            + substituter_config(url, config["public_key"])
+            env.get("NIX_CONFIG", "").rstrip("\n") + "\n" + "".join(settings)
         )
         yield env
 
@@ -172,7 +238,8 @@ def identity_token(audience: str) -> str:
 
     The metadata server first (builders and Cloud Run; a fast probe that is
     remembered when absent), then an explicit service-account credentials
-    file, then a developer's ``gcloud`` login. google.auth is not asked
+    file, then a developer's ``gcloud`` login (bound to ``audience`` when the
+    account allows it; user accounts cannot choose one). google.auth is not asked
     without a credentials file: off GCE it probes the metadata server for
     about twelve seconds before giving up. Tokens are never passed on command
     lines or written to disk.
@@ -192,16 +259,17 @@ def identity_token(audience: str) -> str:
     gcloud = shutil.which("gcloud")
     if gcloud is None:
         raise CacheError("No Google credentials for the Nix cache (ADC or gcloud)")
-    result = subprocess.run(
-        [gcloud, "auth", "print-identity-token"],
-        capture_output=True,
-        text=True,
-        timeout=60,
-        check=False,
-    )
-    if result.returncode or not result.stdout.strip():
-        raise CacheError("gcloud auth print-identity-token failed; check your Google login")
-    return result.stdout.strip()
+    for arguments in (["--audiences=" + audience], []):
+        result = subprocess.run(
+            [gcloud, "auth", "print-identity-token", *arguments],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+        if not result.returncode and result.stdout.strip():
+            return result.stdout.strip()
+    raise CacheError("gcloud auth print-identity-token failed; check your Google login")
 
 
 _not_on_gce = threading.Event()
@@ -227,9 +295,16 @@ def _metadata_token(audience: str) -> str | None:
 class Tokens:
     """A cached token source for one audience; ``refresh()`` after a 401."""
 
-    def __init__(self, audience: str, fetch: Callable[[str], str] = identity_token):
+    def __init__(
+        self,
+        audience: str,
+        fetch: Callable[[str], str] = identity_token,
+        renewable: bool = True,
+    ):
         self.audience = audience
         self.fetch = fetch
+        # A fixed token cannot be renewed; do not retry a rejected one.
+        self.renewable = renewable
         self.lock = threading.Lock()
         self.token: str | None = None
         self.expires = 0.0
@@ -253,9 +328,22 @@ class Tokens:
 class _Upstream:
     """Keep-alive connections to the service, one per bridge thread."""
 
-    def __init__(self, endpoint: str, tokens: Tokens):
+    def __init__(self, endpoint: str, tokens: Tokens | None, scheme: str | None):
         self.endpoint = urllib.parse.urlsplit(endpoint)
         self.tokens = tokens
+        self.scheme = scheme
+        self.local = threading.local()
+
+    def _headers(self, renew: bool) -> dict[str, str]:
+        headers = {"Accept-Encoding": "identity"}
+        if self.scheme is None:
+            return headers
+        token = self.tokens.refresh() if renew else self.tokens()
+        if self.scheme == "Basic":
+            # What curl sends for a netrc entry with a password and no login.
+            token = base64.b64encode((":" + token).encode()).decode()
+        headers["Authorization"] = f"{self.scheme} {token}"
+        return headers
         self.local = threading.local()
 
     def _connection(self) -> http.client.HTTPConnection:
@@ -271,17 +359,13 @@ class _Upstream:
         return connection
 
     def get(self, method: str, key: str) -> http.client.HTTPResponse:
+        renewable = self.scheme is not None and self.tokens.renewable
+        rejected = False
         for attempt in range(3):
-            token = self.tokens() if attempt == 0 else self.tokens.refresh()
             connection = self._connection()
             try:
                 connection.request(
-                    method,
-                    "/" + key,
-                    headers={
-                        "Authorization": "Bearer " + token,
-                        "Accept-Encoding": "identity",
-                    },
+                    method, "/" + key, headers=self._headers(renew=rejected)
                 )
                 response = connection.getresponse()
             except (OSError, http.client.HTTPException):
@@ -290,8 +374,9 @@ class _Upstream:
                 if attempt == 2:
                     raise
                 continue
-            if response.status == 401 and attempt < 2:
+            if response.status == 401 and attempt < 2 and renewable:
                 response.read()
+                rejected = True
                 continue
             return response
         raise AssertionError("unreachable")
@@ -302,11 +387,18 @@ def bridge(
     endpoint: str,
     *,
     tokens: Tokens | None = None,
+    scheme: str | None = "Bearer",
+    hint: str = GOOGLE_HINT,
 ) -> Iterator[str]:
-    """Serve authenticated reads on loopback under an unguessable path."""
+    """Serve cache reads on loopback under an unguessable path.
+
+    ``scheme`` is ``Bearer``, ``Basic`` or ``None`` for a public cache.
+    """
     endpoint = check_endpoint(endpoint)
     prefix = f"/{secrets.token_urlsafe(24)}/"
-    upstream = _Upstream(endpoint, tokens or Tokens(endpoint))
+    if scheme is not None and tokens is None:
+        tokens = Tokens(endpoint)
+    upstream = _Upstream(endpoint, tokens, scheme)
     warned = threading.Event()
 
     class Handler(BaseHTTPRequestHandler):
@@ -337,10 +429,10 @@ def bridge(
                 if response.status in (401, 403) and not warned.is_set():
                     warned.set()
                     log.warning(
-                        "Nix cache %s refused this identity (HTTP %s): you need "
-                        "roles/run.invoker on the cache service",
+                        "Nix cache %s refused this request (HTTP %s): %s",
                         endpoint,
                         response.status,
+                        hint,
                     )
                 if response.status in REDIRECTS and response.getheader("Location"):
                     # A NAR: a short-lived signed URL. Nix follows it itself;

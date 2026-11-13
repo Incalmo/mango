@@ -18,9 +18,10 @@ bypass that policy. Run trusted environment sources only.
 ./bin/mango run /path/to/environment --agent oracle
 ```
 
-`mango.toml` supplies the [remote cache settings](remote-cache.md). Mango
-authenticates on the host, starts a temporary read-only cache proxy, and
-passes its URL and the signing key to the container's own Nix process.
+`mango.toml` names the [remote caches](remote-cache.md), and the user's
+credentials file says how to authenticate to them. Mango authenticates on the
+host, starts a temporary read-only proxy per cache, and passes its URL and
+the signing key to the container's own Nix process.
 Customer tokens and Google credentials are not mounted into the builder.
 Host Nix configuration is neither read nor changed. The builder enforces
 `sandbox = true`, `sandbox-fallback = false`, and signature verification
@@ -71,6 +72,31 @@ Linux capabilities, mounts the Nix volume read-only, and accesses the host
 Docker socket to manage trial containers. It shares host paths so Docker
 bind mounts resolve correctly. Common OpenAI, Anthropic, and Google API-key
 variables are forwarded to this controller only.
+
+## Cleaning up
+
+Builds keep their results so later builds are fast. To remove what one
+environment left behind:
+
+```sh
+./bin/mango clean /path/to/environment
+```
+
+This removes, for that environment and workspace only:
+
+- the generated workspace (`../mango-build/<environment-name>` or `--workspace`),
+  including its Nix garbage-collector roots;
+- the `mango.local/*` Docker images it loaded;
+- Nix store paths that nothing else keeps alive once those roots are gone, in
+  both the host store and the managed builder's volume.
+
+Images also recorded by a sibling workspace, images used by a running
+container, and store paths needed by another environment or root are kept.
+Trial results under `jobs/` are kept unless `--results` is given. The shared
+`mango-nix-*` volume itself is never removed; delete it with
+`docker volume rm` to discard the whole managed store. `clean` prints a JSON
+summary of what it removed and kept. It works for both builders and does not
+need `--builder`.
 
 Supported managed actions are `load`, `prepare`, `compose`, `run`, `build`,
 `fetch`, `check`, `validate`, `declaration`, `validate-contract`, and `lock`.

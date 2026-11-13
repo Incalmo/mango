@@ -13,7 +13,7 @@ import sys
 from contextlib import ExitStack
 from pathlib import Path
 
-from mango import builder, cache
+from mango import builder, cache, clean
 
 ROOT = Path(__file__).resolve().parents[2]
 ACTIONS = {
@@ -120,9 +120,9 @@ def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="mango",
         description="Build and load an environment using its mango.lock.",
-        epilog="Managed builds require local rootful Docker with privileged containers. --builder host uses host Nix. Legacy `mango ENV ACTION ...` uses host Nix.",
+        epilog="clean removes the environment's workspace, loaded images and unshared Nix store paths; it keeps trial results unless --results is given. Managed builds require local rootful Docker with privileged containers. --builder host uses host Nix. Legacy `mango ENV ACTION ...` uses host Nix.",
     )
-    parser.add_argument("action", choices=sorted(ACTIONS | {"lock"}))
+    parser.add_argument("action", choices=sorted(ACTIONS | {"lock", "clean"}))
     parser.add_argument("environment", type=Path)
     parser.add_argument("--workspace", type=Path)
     parser.add_argument("--builder", choices=("container", "host"), default="container")
@@ -134,7 +134,7 @@ def main(argv=None):
 
 
 def launch(argv, parser, stack):
-    if argv and not argv[0].startswith("-") and argv[0] not in ACTIONS | {"lock"}:
+    if argv and not argv[0].startswith("-") and argv[0] not in ACTIONS | {"lock", "clean"}:
         # Preserve the old CLI's flags and semantics, but select its harness
         # from the environment lock when one exists.
         root = Path(argv[0]).resolve()
@@ -156,6 +156,12 @@ def launch(argv, parser, stack):
         workspace = (args.workspace or root.parent / "mango-build" / root.name).resolve()
         if workspace.is_relative_to(root) or root.is_relative_to(workspace):
             parser.error("workspace must be separate from the environment")
+        if args.action == "clean":
+            # Works for both backends and never creates a lock or a workspace.
+            if extra not in ([], ["--results"]):
+                parser.error("clean accepts only --results")
+            print(json.dumps(clean.clean(root, workspace, results=bool(extra)), indent=2))
+            return
         pin = ensure_lock(root)
         if args.builder == "container":
             return builder.run(root, workspace, args.action, extra, pin)

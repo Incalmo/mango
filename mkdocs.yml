@@ -1,0 +1,102 @@
+site_name: Mango
+site_description: A declarative DSL for RL environments and a drop-in replacement for Dockerfiles.
+site_url: https://incalmo.github.io/mango/
+repo_url: https://github.com/Incalmo/mango
+repo_name: Incalmo/mango
+edit_uri: edit/main/docs/
+docs_dir: docs
+site_dir: build/site
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep orange
+      accent: orange
+      toggle: { icon: material/weather-night, name: Dark mode }
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep orange
+      accent: orange
+      toggle: { icon: material/weather-sunny, name: Light mode }
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - navigation.footer
+    - content.code.copy
+    - content.tabs.link
+    - search.highlight
+    - toc.follow
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc: { permalink: true }
+  - pymdownx.details
+  - pymdownx.highlight: { anchor_linenums: true }
+  - pymdownx.superfences
+  - pymdownx.tabbed: { alternate_style: true }
+
+plugins:
+  - search
+
+nav:
+  - Home: index.md
+  - Get started:
+      - Quick start: quickstart.md
+      - How it works: how-it-works.md
+  - Languages:
+      - languages/index.md
+      - Python: languages/python.md
+      - JavaScript: languages/javascript.md
+      - TypeScript: languages/typescript.md
+      - Java: languages/java.md
+      - "C#": languages/csharp.md
+      - C++: languages/cpp.md
+      - C: languages/c.md
+      - Go: languages/go.md
+      - Rust: languages/rust.md
+      - PHP: languages/php.md
+      - Kotlin: languages/kotlin.md
+      - Swift: languages/swift.md
+      - Ruby: languages/ruby.md
+      - R: languages/r.md
+      - Scala: languages/scala.md
+      - Dart: languages/dart.md
+      - Perl: languages/perl.md
+      - Lua: languages/lua.md
+      - Haskell: languages/haskell.md
+      - Elixir: languages/elixir.md
+  - Guides:
+      - Describe an environment:
+          - Environments: declarative-environments.md
+          - Linux images: linux-images.md
+          - Containers and packages: containers.md
+          - Reuse an upstream image: pinned-images.md
+          - Task sources: task-sources.md
+      - Pin dependencies:
+          - Record and replay: record-replay.md
+          - Authoring tools: authoring-tools.md
+          - Distro package state: package-state.md
+          - Pinned files: pinned-files.md
+          - Authoring with an agent: agent-authoring.md
+      - Ecosystem notes:
+          - Dependency adapters: dependency-adapters.md
+          - Go modules: go-module-locks.md
+          - Go workspaces: go-workspaces.md
+          - npm: npm-cache.md
+          - pnpm: pnpm-cache.md
+          - Composer: composer-cache.md
+          - Rustup toolchains: rustup-toolchains.md
+          - Java trust stores: jks-trust-stores.md
+  - Operate:
+      - Managed builder and cleanup: managed-builder.md
+      - Remote binary caches: remote-cache.md
+      - Hosted builds: hosted-builds.md
+      - Environment manifest: environment-manifest.md
+      - Trial results: trial-results.md

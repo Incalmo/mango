@@ -46,6 +46,18 @@
       exit 1
     '';
   dependencies = import ./adapters { inherit pkgs; };
+  # Static, so it runs inside any base image: records or replays a command's
+  # HTTP(S) downloads. See docs/record-replay.md.
+  replayProxy = pkgs.runCommand "mango-proxy" {
+    package = pkgs.buildGoModule {
+      pname = "mango-proxy";
+      version = "1";
+      src = builtins.path { path = ../proxy; name = "mango-proxy-source"; };
+      vendorHash = null;
+      env.CGO_ENABLED = "0";
+      ldflags = [ "-s" "-w" ];
+    };
+  } "cp $package/bin/proxy $out";
   mkImage = import ./images/mk-image.nix { inherit pkgs; };
   nix2container = import ./pins/nix2container.nix { inherit pkgs; };
   egressImage = import ./images/egress.nix { inherit pkgs; };
