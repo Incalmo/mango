@@ -22,6 +22,7 @@ mango-prepare-prefix = "mango.authoring.package_state:prepare_main"
 mango-lock-indexes = "mango.authoring.package_state:indexes_main"
 mango-lock-npm = "mango.authoring.npm_lock:main"
 mango-lock-composer = "mango.authoring.composer_lock:main"
+mango-lock-record = "mango.authoring.record_lock:main"
 mango-prepare-php = "mango.authoring.php_prefix:main"
 
 [build-system]

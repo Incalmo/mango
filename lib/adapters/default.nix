@@ -33,16 +33,25 @@ let
     } // (if sha256 != null then { inherit sha256; } else { inherit sha512; }));
   # Hash attributes of a lock record, whichever of sha256/sha512 it carries.
   recordHash = record: { sha256 = record.sha256 or null; sha512 = record.sha512 or null; };
-  fetchMavenDependency = record: fetchDependency ({
-    name = builtins.baseNameOf record.path;
-    inherit (record) urls;
-  } // recordHash record);
-  fetchDependencyCache = { name, artifacts, metadata ? [] }:
+  # A record names its bytes by URL, or by `file`: a path relative to `root`
+  # for bytes committed beside the lock because no URL keeps serving them.
+  # `extra` adds already-built store paths, such as tools, by destination name.
+  fetchDependencyCache = { name, artifacts, metadata ? [], root ? null, extra ? {} }:
     let
-      records = validatePaths (artifacts ++ metadata);
+      extras = lib.mapAttrsToList (path: _: { inherit path; }) extra;
+      records = validatePaths (artifacts ++ metadata ++ extras);
+      local = record:
+        assert lib.assertMsg (root != null && validPath record.file && !(record ? urls))
+          "a committed dependency file needs a lock directory and a relative path, and no URLs";
+        builtins.path {
+          path = root + "/${record.file}";
+          name = lib.strings.sanitizeDerivationName (builtins.baseNameOf record.path);
+          sha256 = record.sha256;
+          recursive = false;
+        };
       downloads = map (record: {
         name = record.path;
-        path = fetchDependency ({
+        path = if record ? file then local record else fetchDependency ({
           name = builtins.baseNameOf record.path;
           inherit (record) urls;
         } // recordHash record);
@@ -54,9 +63,10 @@ let
           "dependency metadata content hash mismatch";
           pkgs.writeText (lib.strings.sanitizeDerivationName (builtins.baseNameOf record.path)) record.content;
       }) metadata;
-    in builtins.deepSeq records (pkgs.linkFarm name (downloads ++ generated));
+      added = lib.mapAttrsToList (name: path: { inherit name path; }) extra;
+    in builtins.deepSeq records (pkgs.linkFarm name (downloads ++ generated ++ added));
 in {
-  inherit fetchDependency fetchMavenDependency fetchDependencyCache;
+  inherit fetchDependency fetchDependencyCache;
   fetchRustupToolchain = import ./rustup.nix { inherit pkgs; };
   # Explicitly selected native-lock reader: Cargo registry checksums are reused.
   # Git entries need supplemental NAR hashes; never fetch unhashed Git in eval.
@@ -70,7 +80,7 @@ in {
   # resolution, lockfile translation or command inspection takes place here.
   # `prefixes` selects the entries one image needs (a path equal to a prefix or
   # under it), so an image's inputs never change when another image's do.
-  fetchLockedInputs = { lock, name ? "environment-inputs", prefixes ? null }:
+  fetchLockedInputs = { lock, name ? "environment-inputs", prefixes ? null, extra ? {} }:
     let
       document = builtins.fromJSON (builtins.readFile lock);
       wanted = artifact: prefixes == null || builtins.any
@@ -82,42 +92,12 @@ in {
         "inputs lock requires an explicit artifacts list";
       assert lib.assertMsg (prefixes == null || builtins.all builtins.isString prefixes)
         "fetchLockedInputs prefixes must be a list of path strings";
-      fetchDependencyCache { inherit name; artifacts = builtins.filter wanted document.artifacts; };
-
-  fetchMavenCache = { lock, name ? "maven-repository" }:
-    let
-      document = builtins.fromJSON (builtins.readFile lock);
-      downloads = assert document.schema_version == 1; fetchDependencyCache {
-        name = "${name}-downloads";
-        artifacts = document.artifacts;
-        metadata = document.resolver_metadata or [];
+      fetchDependencyCache {
+        inherit name extra;
+        root = builtins.dirOf lock;
+        artifacts = builtins.filter wanted document.artifacts;
       };
-      groups = builtins.groupBy (record: builtins.dirOf record.path)
-        (builtins.filter (record: lib.hasSuffix ".jar" record.path || lib.hasSuffix ".pom" record.path)
-          document.artifacts);
-      markerData = pkgs.writeText "maven-local-origins.json" (builtins.toJSON
-        (builtins.mapAttrs (_: records: lib.concatMapStrings
-          (record: "${builtins.baseNameOf record.path}>=\n") records) groups));
-      markerFiles = pkgs.runCommand "maven-local-origins" { nativeBuildInputs = [pkgs.python3]; } ''
-        python - ${markerData} "$out" <<'PYTHON'
-import json, pathlib, sys
-for directory, content in json.load(open(sys.argv[1])).items():
-    target = pathlib.Path(sys.argv[2]) / directory / "_remote.repositories"
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(content)
-PYTHON
-      '';
-      markers = lib.mapAttrsToList (dir: _: {
-        name = "${dir}/_remote.repositories";
-        path = "${markerFiles}/${dir}/_remote.repositories";
-      }) groups;
-      links = map (record: { name = record.path; path = "${downloads}/${record.path}"; })
-        (document.artifacts ++ (document.resolver_metadata or []));
-    in assert lib.assertMsg (builtins.all (record:
-      builtins.baseNameOf record.path != "_remote.repositories")
-      (document.artifacts ++ (document.resolver_metadata or [])))
-      "Maven origin markers are generated by the adapter, not imported from a host";
-      pkgs.linkFarm name (links ++ markers);
+
   fetchPythonWheelhouse = { artifacts, name ? "python-wheelhouse" }:
     assert lib.assertMsg (builtins.all (record:
       lib.hasSuffix ".whl" record.path && !lib.hasInfix "/" record.path) artifacts)

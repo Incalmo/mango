@@ -159,6 +159,17 @@ def run_runtime(root, workspace, action, extra, pin, volume, socket):
         subprocess.run(["docker", "rm", "--force", name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
+def volume_name(pin):
+    # One store per builder version and local user, reusable across tasks.
+    return "mango-nix-" + str(os.getuid()) + "-" + pin["image"].split(":")[-1][:16]
+
+
+def volume_workspace(root, workspace):
+    """Where one environment's build bookkeeping lives inside the volume."""
+    identity = hashlib.sha256((str(root) + "\0" + str(workspace)).encode()).hexdigest()[:24]
+    return f"/nix/var/mango/workspaces/{identity}"
+
+
 def run(root, workspace, action, extra, harness_pin):
     if action not in SUPPORTED:
         raise ValueError(f"{action} is not supported by the managed builder; use --builder host")
@@ -173,10 +184,8 @@ def run(root, workspace, action, extra, harness_pin):
         if action == "lock":
             print(json.dumps({"lock": str(root / "mango.lock"), "builder": pin}))
             return
-        # One store per builder version and local user, reusable across tasks.
-        volume = "mango-nix-" + str(os.getuid()) + "-" + pin["image"].split(":")[-1][:16]
-        identity = hashlib.sha256((str(root) + "\0" + str(workspace)).encode()).hexdigest()[:24]
-        work = f"/nix/var/mango/workspaces/{identity}"
+        volume = volume_name(pin)
+        work = volume_workspace(root, workspace)
         name = "mango-builder-" + uuid.uuid4().hex
         with tempfile.TemporaryDirectory(prefix=".builder-", dir=workspace) as temporary:
             stage = Path(temporary)
@@ -187,7 +196,8 @@ def run(root, workspace, action, extra, harness_pin):
             ]
             script = bootstrap(harness_pin, worker)
             with cache.session(root, check_trust=False, inherit_config=False) as cache_env:
-                env = dict(os.environ)
+                # The session's copy no longer holds the cache token.
+                env = dict(os.environ if cache_env is None else cache_env)
                 env["NIX_CONFIG"] = (
                     (cache_env or {}).get("NIX_CONFIG", "")
                     + "\nexperimental-features = nix-command flakes\n"

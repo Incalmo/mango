@@ -5,6 +5,8 @@ Dockerfiles. Declare an environment once: Mango freezes every input it
 depends on and builds it offline from then on. Environments run as ordinary
 [Harbor](https://github.com/harbor-framework/harbor) tasks.
 
+**[Read the documentation →](https://incalmo.github.io/mango/)**
+
 - **Reproducible.** Base images, distro packages and language dependencies are
   pinned by content hash. An environment built next year contains the same
   files as the one built today; it never drifts.
@@ -13,9 +15,10 @@ depends on and builds it offline from then on. Environments run as ordinary
   send 1,000 builds to Docker Hub, the Ubuntu archive, Maven Central or npm,
   so nothing gets throttled.
 - **General.** Builds run the base image's own shell and installers, so any
-  Linux distro works. Lock tools cover apt, apk, opkg, pip, npm, pnpm, Cargo,
-  rustup, Go, Maven and Composer; anything else goes through a generic
-  URL + SHA-256 lock.
+  Linux distro works. Mango locks a package manager by recording what it
+  downloads and replaying it offline, so it needs no per-language support:
+  [25 package managers across 20 languages](docs/record-replay.md#verified-package-managers)
+  are verified, and a new one works the same way.
 
 ## How it works
 
@@ -145,6 +148,9 @@ The oracle trial ends with `"reward": 1.0`. The first `load` also writes
 the machine running environments needs Docker but not Nix. Add
 `--builder host` to use an existing Nix installation instead.
 
+When you are done, `./bin/mango clean $ENV` removes the environment's
+workspace, its Docker images and the cached build results nothing else uses.
+
 ### Dockerfile vs. Mango
 
 | Dockerfile | Mango | Why |
@@ -160,18 +166,27 @@ The resulting environment is three things you commit: `default.nix`,
 
 ## Documentation
 
+The docs are published at **<https://incalmo.github.io/mango/>**, with search
+and a Dockerfile-versus-Mango page for each of 20 languages. To preview
+changes locally:
+
+```sh
+nix-shell docs.nix --run 'mkdocs serve'
+```
+
+Good starting points:
+
+- [Languages](docs/languages/index.md): a Dockerfile and its Mango equivalent
+  for Python, JavaScript, Java, C#, Go, Rust and 14 more.
+- [How it works](docs/how-it-works.md): author online once, build offline.
+- [Record and replay](docs/record-replay.md): lock any package manager by
+  recording what its build downloads.
 - [Declarative environments](docs/declarative-environments.md): `mkEnvironment`,
   services, verifiers and the `mango` commands.
-- [Linux images](docs/linux-images.md) and [containers](docs/containers.md):
-  `mkLinuxImage`, `mkContainer`, multi-stage builds.
 - [Authoring tools](docs/authoring-tools.md): the `mango-pin-*` and
   `mango-lock-*` commands.
-- [Dependency adapters](docs/dependency-adapters.md): per-ecosystem helpers
-  ([npm](docs/npm-cache.md), [pnpm](docs/pnpm-cache.md),
-  [Go](docs/go-module-locks.md), [Rust](docs/rustup-toolchains.md),
-  [Composer](docs/composer-cache.md)).
-- [Remote binary caches](docs/remote-cache.md) and
-  [hosted builds](docs/hosted-builds.md).
+- [Managed builder and cleanup](docs/managed-builder.md) and
+  [remote binary caches](docs/remote-cache.md).
 
 Mango currently builds `linux/amd64` images on x86_64 Linux.
 

@@ -12,14 +12,17 @@ Import `lib/adapters/default.nix` with the pinned `pkgs`:
 ```nix
 let deps = import (harness + /lib/adapters) { inherit pkgs; }; in
 {
-  repository = deps.fetchMavenCache { lock = ./locks/maven.json; };
-  artifact = deps.fetchMavenDependency {
-    path = "org/example/demo/1.0/demo-1.0.jar";
+  inputs = deps.fetchLockedInputs { lock = ./inputs.lock.json; };
+  artifact = deps.fetchDependency {
+    name = "demo-1.0.jar";
     urls = [ "https://repo.example/org/example/demo/1.0/demo-1.0.jar" ];
     sha256 = "<reviewed SHA-256>";
   };
 }
 ```
+
+For a package manager without an adapter below, including Maven, Gradle and
+NuGet, lock what its build downloads with [record and replay](record-replay.md).
 
 `fetchDependency { name; urls; sha256; }` is the common immutable leaf fetcher;
 supply `sha512` instead of `sha256` when upstream publishes only SHA-512.
@@ -33,7 +36,7 @@ must never contain credentials or signed expiring URLs.
 | Adapter | Store output | Offline consumption | Limits |
 | --- | --- | --- | --- |
 | `fetchCargoCache { lockFile; outputHashes ? {}; }` | Vendored crates selected from `Cargo.lock` using its checksums | Use `cargoSetupHook` with `cargoDeps`; compile with `--frozen --offline` | Git sources require supplemental content hashes; build-script downloads need explicit additional inputs |
-| `fetchMavenDependency`, `fetchMavenCache` | Individual files; linked Maven repository and generated local-origin markers | Copy to fresh `.m2/repository`; set Maven offline | Lock must include plugins, parent POMs, classifiers, transitives and resolver metadata; not a resolver |
+| `fetchLockedInputs { lock; prefixes ? null; extra ? {}; }` | Linked files from `inputs.lock.json`: downloads by URL, files committed beside the lock, and `extra` store paths | Read from the input directory, or replay with `mango-proxy` | Lists exact files; resolves nothing |
 | `fetchPythonWheelhouse` | Flat directory linking hashed wheels | `pip --no-index --find-links`; `UV_OFFLINE=1` | Select wheels for pinned Python ABI/OS/CPU; source distributions need separately built wheels and build dependencies |
 | `fetchNpmCache { source; }` | Per-package Nixpkgs downloads and localized manifests | Use `npmConfigHook` with `npmDeps`; ordinary sandboxed build | Lock v2/v3; registry HTTP(S) with integrity; Git/workspace inputs explicitly rejected for now |
 | `fetchBunCache` | Hash-verified whole dependency-cache tree | Copy to private `BUN_INSTALL_CACHE_DIR`; build without network | Explicit `projectFiles` includes all workspace package manifests/config; whole-tree cache, not per-package deduplication |
@@ -53,13 +56,13 @@ translate Dockerfiles.
 Add `deps.prepareCache` to `nativeBuildInputs`, then:
 
 ```sh
-prepare-dependency-cache "$MAVEN_STORE_CACHE" "$TMPDIR/home/.m2/repository"
+prepare-dependency-cache "$STORE_CACHE" "$TMPDIR/cache"
 ```
 
 The destination must not exist. The helper dereferences immutable links into a
 private writable directory. Package managers must never modify `/nix/store` or
 share an ambient host HOME. This intentionally copies data at build time; the
-shared Maven store layout itself links artifacts to preserve reuse and GC references.
+shared store layout itself links artifacts to preserve reuse and GC references.
 
 Bun accepts `{ bun; source; hash; projectFiles ? [ "package.json" "bun.lock" ]; }`.
 Supply workspace manifests, patches and required local inputs explicitly. Network

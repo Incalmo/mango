@@ -220,45 +220,47 @@ class Adapters(unittest.TestCase):
             )
             self.assertNotEqual(result.returncode, 0, url)
 
-    def test_maven_links_and_private_cache(self):
+    def test_locked_inputs_mix_urls_committed_files_and_extras(self):
         with tempfile.TemporaryDirectory() as directory:
-            lock = Path(directory) / "lock.json"
-            lock.write_text(
-                json.dumps(
-                    {
-                        "schema_version": 1,
-                        "artifacts": [
-                            {
-                                "path": "org/example/1/example-1.jar",
-                                "urls": [self.url],
-                                "sha256": HASH,
-                            },
-                            {
-                                "path": "org/example/1/example-1.pom",
-                                "urls": [self.url],
-                                "sha256": HASH,
-                            },
-                        ],
-                    }
-                )
+            root = Path(directory)
+            committed = b"bytes no URL keeps serving\n"
+            digest = hashlib.sha256(committed).hexdigest()
+            (root / "inputs.lock.d").mkdir()
+            (root / "inputs.lock.d" / digest).write_bytes(committed)
+            lock = root / "inputs.lock.json"
+
+            def write(file_hash):
+                lock.write_text(json.dumps({"schema_version": 1, "artifacts": [
+                    {"path": "record/app/blobs/a", "urls": [self.url], "sha256": HASH},
+                    {"path": "record/app/index.json", "file": f"inputs.lock.d/{digest}", "sha256": file_hash},
+                    {"path": "other/skipped", "urls": [self.url], "sha256": HASH},
+                ]}))
+
+            write(digest)
+            expr = (
+                f"a.fetchLockedInputs {{ lock = {lock}; prefixes = [ \"record/app\" ];"
+                ' extra."tool" = pkgs.writeText "tool" "tool"; }'
             )
-            cache = self.build(f"a.fetchMavenCache {{ lock = {lock}; }}")
-            artifact = cache / "org/example/1/example-1.jar"
-            self.assertTrue(artifact.is_symlink())
-            self.assertEqual(artifact.read_bytes(), PAYLOAD)
-            marker = (cache / "org/example/1/_remote.repositories").read_text()
-            self.assertIn("example-1.jar>=", marker)
-            self.assertIn("example-1.pom>=", marker)
-            prepare = self.build("a.prepareCache") / "bin/prepare-dependency-cache"
-            target = Path(directory) / "cache"
-            subprocess.run([prepare, cache, target], check=True)
-            (target / "org/example/1/example-1.jar").write_text("modified")
-            self.assertEqual(artifact.read_bytes(), PAYLOAD)
+            cache = self.build(expr)
+            self.assertEqual((cache / "record/app/blobs/a").read_bytes(), PAYLOAD)
+            self.assertEqual((cache / "record/app/index.json").read_bytes(), committed)
+            self.assertEqual((cache / "tool").read_text(), "tool")
+            self.assertFalse((cache / "other").exists())
+            # A committed file is hash-checked like a download.
+            write("0" * 64)
             self.assertNotEqual(
                 subprocess.run(
-                    [prepare, cache, target], capture_output=True, check=False
+                    ["nix-build", "--no-out-link", "--expr", PREFIX + expr], capture_output=True, check=False
                 ).returncode,
                 0,
+            )
+            prepare = self.build("a.prepareCache") / "bin/prepare-dependency-cache"
+            target = root / "cache"
+            subprocess.run([prepare, cache, target], check=True)
+            (target / "record/app/blobs/a").write_text("modified")
+            self.assertEqual((cache / "record/app/blobs/a").read_bytes(), PAYLOAD)
+            self.assertNotEqual(
+                subprocess.run([prepare, cache, target], capture_output=True, check=False).returncode, 0
             )
 
     def test_wheelhouse_and_incomplete_hash(self):

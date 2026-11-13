@@ -11,6 +11,9 @@ For official Rust release manifests and faithful Rustup selector precedence,
 see [Rustup toolchains](rustup-toolchains.md). For exact Go module proxy inputs,
 including fixed-version replacements, see [Go module locks](go-module-locks.md).
 
+For any package manager without a dedicated tool here, `mango-lock-record`
+locks whatever a build command downloads: see [record and replay](record-replay.md).
+
 ## Pin a base image
 
 ```sh

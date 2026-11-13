@@ -31,6 +31,7 @@ in pkgs.mkShell {
     (command "mango-lock-indexes" "mango.authoring.package_state indexes")
     (command "mango-lock-npm" "mango.authoring.npm_lock")
     (command "mango-lock-composer" "mango.authoring.composer_lock")
+    (command "mango-lock-record" "mango.authoring.record_lock")
     (command "mango-prepare-php" "mango.authoring.php_prefix")
   ];
   shellHook = ''
