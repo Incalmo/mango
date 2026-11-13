@@ -3,6 +3,7 @@
 Run with: nix-shell --run 'python -m unittest tests.lib.test_composer_cache'
 """
 
+import hashlib
 import json
 import subprocess
 import tempfile
@@ -11,6 +12,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SHA = "a" * 64
+HTACCESS = {"path": ".htaccess", "content": "Deny from all",
+            "sha256": hashlib.sha256(b"Deny from all").hexdigest()}
 PREFIX = f"""let pkgs = import (import {ROOT}/lib/pins/nixpkgs.nix) {{ system = "x86_64-linux"; }};
  d = import {ROOT}/lib/adapters {{ inherit pkgs; }}; in """
 
@@ -84,6 +87,35 @@ class ComposerCache(unittest.TestCase):
 
     def test_unmapped_files_fail_closed(self):
         self.rejected(self.lock(unmapped_files=[{"path": "repo/x.json", "sha256": SHA}]), "unmapped_files")
+
+    def test_accepts_the_known_generated_htaccess_and_it_changes_the_derivation(self):
+        plain = self.evaluate(self.lock())
+        with_file = self.evaluate(self.lock(generated_files=[HTACCESS]))
+        self.assertEqual(with_file.returncode, 0, with_file.stderr)
+        self.assertNotEqual(plain.stdout, with_file.stdout)
+        self.accepted(self.lock(generated_files=[]))
+
+    def test_generated_files_are_a_closed_exact_set(self):
+        for name, entry in {
+            "other path": {**HTACCESS, "path": "files/x"},
+            "nested path": {**HTACCESS, "path": "sub/.htaccess"},
+            "traversal": {**HTACCESS, "path": "../.htaccess"},
+            "other content": {**HTACCESS, "content": "Allow from all",
+                              "sha256": hashlib.sha256(b"Allow from all").hexdigest()},
+            "newline": {**HTACCESS, "content": "Deny from all\n",
+                        "sha256": hashlib.sha256(b"Deny from all\n").hexdigest()},
+            "wrong hash": {**HTACCESS, "sha256": "0" * 64},
+            "extra key": {**HTACCESS, "urls": ["https://example.com/.htaccess"]},
+            "missing content": {"path": ".htaccess", "sha256": HTACCESS["sha256"]},
+        }.items():
+            with self.subTest(name):
+                self.rejected(self.lock(generated_files=[entry]), "generated_files")
+        self.rejected(self.lock(generated_files=[HTACCESS, HTACCESS]), "duplicate")
+        self.rejected(self.lock(generated_files="x"), "generated_files")
+        self.rejected(self.lock(generated_files=[HTACCESS], unmapped_files=[{"path": "x", "sha256": SHA}]), "unmapped_files")
+
+    def test_an_archive_cannot_occupy_the_generated_path(self):
+        self.rejected(self.lock([artifact(".htaccess")], generated_files=[HTACCESS]), "safe files/")
 
 
 if __name__ == "__main__":

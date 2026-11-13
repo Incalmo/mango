@@ -1,7 +1,9 @@
 { pkgs }:
 # Build an image description with nix2container. The result is a small JSON
-# file that references store paths; `oci.py load` streams the layers straight
-# from /nix/store into Docker, so no image archive is kept in the store.
+# file referencing immutable layer blobs. Application derivations can produce
+# different bytes at the same input-addressed store path on different builders.
+# Hash and retain each layer once; never reconstruct a cached hash from those
+# paths during export.
 let
   n2c = import ../pins/nix2container.nix { inherit pkgs; };
   lib = pkgs.lib;
@@ -44,12 +46,6 @@ let
     + lib.concatMapStrings (d: "mkdir -p \"$out\"/" + lib.escapeShellArg (lib.removePrefix "/" d.path) + "\n") dirs
   );
   escape = lib.escapeRegex;
-in
-n2c.buildImage {
-  name = "mango/${name}";
-  inherit config fromImage maxLayers;
-  created = "1970-01-01T00:00:01Z";
-  copyToRoot = [ rootfs ];
   # Restore owner write permission stripped by the store, without making data
   # files executable (symlink modes are ignored). Later entries win, so specific
   # directories override the default.
@@ -62,4 +58,20 @@ n2c.buildImage {
       uid = d.uid or 0;
       gid = d.gid or 0;
     }) (dirs ++ filePerms);
+  configFile = pkgs.writeText "config.json" (builtins.toJSON config);
+  layer = n2c.buildLayer {
+    inherit maxLayers perms;
+    copyToRoot = [ rootfs ];
+    deps = [ configFile ];
+    ignore = configFile;
+    # nix2container's name means "retain the tar", not "allow corrupt data".
+    # The blob and its digest are then substituted as one Nix output.
+    reproducible = false;
+  };
+in
+n2c.buildImage {
+  name = "mango/${name}";
+  inherit config fromImage;
+  created = "1970-01-01T00:00:01Z";
+  layers = [ layer ];
 }

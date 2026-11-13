@@ -26,6 +26,12 @@ in pkgs.mkShell {
     (command "mango-lock-packages" "mango.authoring.packages")
     (command "mango-lock-python" "mango.authoring.python_lock")
     (command "mango-lock-rustup" "mango.authoring.rustup_lock")
+    (command "mango-lock-go" "mango.authoring.go_lock")
+    (command "mango-prepare-prefix" "mango.authoring.package_state prepare")
+    (command "mango-lock-indexes" "mango.authoring.package_state indexes")
+    (command "mango-lock-npm" "mango.authoring.npm_lock")
+    (command "mango-lock-composer" "mango.authoring.composer_lock")
+    (command "mango-prepare-php" "mango.authoring.php_prefix")
   ];
   shellHook = ''
     export PYTHONPATH=${source}''${PYTHONPATH:+:$PYTHONPATH}

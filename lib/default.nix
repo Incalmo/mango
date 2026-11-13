@@ -5,6 +5,7 @@
   jksTrustStoreNormalizer = ../builders/normalize_jks.py;
   stageDebsScript = ../builders/stage-debs.sh;
   installDebsScript = ../builders/install-debs.sh;
+  installApksScript = ../builders/install-apks.sh;
   restoreAptIndexesScript = ../builders/restore-apt-indexes.sh;
   pinnedImage = import ./images/pinned-image.nix { inherit pkgs; };
   pinnedFilesScript = ../builders/pinned_files.py;

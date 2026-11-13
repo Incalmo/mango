@@ -135,6 +135,14 @@ digests and sizes, leaving serialized architecture, OS, ordered layers,
 rootfs diff IDs and generated history unchanged. This applies to both pinned
 registry bases and native OCI bases.
 
+`mkContainer` retains each generated layer tar with its digest in the Nix store.
+Publishing copies those bytes; it does not regenerate a cached layer from its
+input-addressed dependency paths. Different realizations of a dependency can
+contain different bytes at the same store path, so regenerating the layer can
+disagree with the cached image's digest. Retaining layers uses additional store
+and binary-cache space, but keeps the image description and exported bytes
+together. Existing image descriptions need rebuilding to use this format.
+
 For native Debian/Ubuntu builds, `h.stageDebsScript` stages an explicitly supplied
 set of pinned `.deb` files under apt's canonical archive names. Run it using the
 base image's `sh` and `dpkg-deb`; it requires standard `cp`, `cmp`, `mv`, `sed`,
@@ -175,6 +183,15 @@ metadata. Output replacement is atomic, including when input equals output.
 This changes archive bytes and requires a new archive hash. Use the same pinned
 Python/zlib toolchain for reproducibility and verify application startup afterward;
 the helper does not repair nondeterministic entry contents or resolve dependencies.
+
+`h.installApksScript` replays a complete locked APK transaction offline. Pass the
+directory containing its hash-checked `.apk` files, followed by the original
+requested package roots. It installs the archives with `--no-cache --no-network`,
+restores the original `/etc/apk/world`, then marks only the requested roots. An
+empty directory is supported when the requested packages are already installed.
+This helper does not resolve dependencies: the lock must describe the exact
+transaction selected against the original base and repository policy. Include
+the helper and the selected archive directory as explicit native image inputs.
 
 `h.installDebsScript` installs one complete pinned apt transaction while retaining
 apt's manual/automatic package marks:

@@ -51,7 +51,7 @@ CACHE_ENV = "MANGO_LOCK_CACHE"
 OFFLINE_ENV = "MANGO_LOCK_OFFLINE"
 # Older apt caches could omit URI lines whose indexes no longer carry MD5;
 # older apk caches described recursive fetches rather than exact transactions.
-RESOLVER_VERSIONS = {"apt": 2, "apk": 2, "opkg": 1}
+RESOLVER_VERSIONS = {"apt": 2, "apk": 3, "opkg": 1}
 CA_BUNDLE = "/etc/mango-lock-ca.crt"
 STAGE_MARKER = "@@mango-stage "
 APT_URI = re.compile(
@@ -147,6 +147,8 @@ class PackageStage(BaseModel):
     debconf_selections: tuple[str, ...] = ()
     repository_keys: tuple[RepositoryKey, ...] = ()
     apt_preferences: tuple[AptPreference, ...] = ()
+    #: Preserve a common original service-start policy before this transaction.
+    policy_rc_d: Literal["deny"] | None = None
 
     @model_validator(mode="after")
     def validate_transaction(self):
@@ -201,6 +203,8 @@ class LockRequest(BaseModel):
             for field in ("repository_keys", "apt_preferences"):
                 if not stage.get(field):
                     stage.pop(field, None)
+            if stage.get("policy_rc_d") is None:
+                stage.pop("policy_rc_d", None)
         return value
 
     @property
@@ -432,6 +436,9 @@ def apt_script(request: LockRequest, *, start: int = 0, initialize: bool = True,
     for index, stage in enumerate(request.stages):
         if index < start:
             continue
+        if stage.policy_rc_d == "deny":
+            lines += ["printf '%s' " + shlex.quote("#!/bin/sh\nexit 101\n")
+                      + " > /usr/sbin/policy-rc.d", "chmod +x /usr/sbin/policy-rc.d"]
         for key in stage.repository_keys:
             path = shlex.quote(key.path)
             source = f"/mango/author-keys/{key.sha256}"
@@ -510,7 +517,7 @@ def opkg_script(request: LockRequest) -> str:
     for index, stage in enumerate(request.stages):
         if (stage.local_debs or stage.operation != "apt_install" or stage.clear_lists_before
                 or stage.update_before or stage.install_recommends is not False or stage.debconf_selections
-                or stage.repository_keys or stage.apt_preferences):
+                or stage.repository_keys or stage.apt_preferences or stage.policy_rc_d is not None):
             raise LockError("opkg stages do not support Debian input operations")
         if stage.sources is not None:
             raise LockError("opkg stages do not support apt source replacement")
@@ -635,7 +642,7 @@ def apk_script(request: LockRequest) -> str:
     for index, stage in enumerate(request.stages):
         if (stage.local_debs or stage.operation != "apt_install" or stage.clear_lists_before
                 or stage.update_before or stage.install_recommends is not False or stage.debconf_selections
-                or stage.repository_keys or stage.apt_preferences):
+                or stage.repository_keys or stage.apt_preferences or stage.policy_rc_d is not None):
             raise LockError("apk stages do not support Debian input operations")
         if stage.target_release or stage.extra_sources or stage.sources is not None:
             raise LockError("apk stages do not support apt release/source options")
@@ -648,12 +655,15 @@ def apk_script(request: LockRequest) -> str:
             # installed dependencies that apk add would retain. Lock only the
             # exact versions selected by the original add transaction instead.
             "awk '\n"
-            "  /^\\([0-9]+\\/[0-9]+\\)/ {\n"
-            "    if ($2 != \"Installing\" && $2 != \"Upgrading\" &&\n"
-            "        $2 != \"Downgrading\" && $2 != \"Reinstalling\") exit 1;\n"
+            "  /^[[:space:]]*\\([[:space:]]*[0-9]+\\/[[:space:]]*[0-9]+\\)/ {\n"
+            "    sub(/^[[:space:]]*\\([[:space:]]*[0-9]+\\/[[:space:]]*[0-9]+\\)[[:space:]]*/, \"\");\n"
+            "    if ($1 != \"Installing\" && $1 != \"Upgrading\" &&\n"
+            "        $1 != \"Downgrading\" && $1 != \"Reinstalling\") exit 1;\n"
             "    version=$NF; gsub(/[()]/, \"\", version);\n"
-            "    print $3 \"=\" version;\n"
-            "  }' " + f"{directory}/transaction > {directory}/selected",
+            "    print $2 \"=\" version; next;\n"
+            "  }\n"
+            "  /Installing|Upgrading|Downgrading|Reinstalling|Purging/ { exit 1 }' "
+            + f"{directory}/transaction > {directory}/selected",
             f": > {directory}/urls",
             "while IFS= read -r selected; do\n"
             # apk-tools 2.14 fetch accepts package names, not name=version.
@@ -715,25 +725,41 @@ def main():
         prog="mango-lock-packages", description=__doc__.split("\n")[0]
     )
     parser.add_argument("--lock", type=Path, required=True, help="inputs.lock.json to update")
-    parser.add_argument("--manager", choices=["apt", "opkg", "apk"], default="apt")
-    parser.add_argument("--base", required=True, help="pinned base image@sha256:...")
+    parser.add_argument("--request", type=Path, help="complete typed LockRequest JSON, including repository timeline")
+    parser.add_argument("--receipt", type=Path, help="write a portable package-state receipt")
+    parser.add_argument("--manager", choices=["apt", "opkg", "apk"])
+    parser.add_argument("--base", help="pinned base image@sha256:...")
     parser.add_argument("--source", action="append", default=[], help="package source line")
     parser.add_argument(
-        "--stage", action="append", required=True,
+        "--stage", action="append",
         help="space-separated packages for one transaction; repeat for ordered stages",
     )
     parser.add_argument("--target-release", help="apt -t suite for every stage")
     args = parser.parse_args()
-    request = LockRequest(
-        manager=args.manager,
-        base=args.base,
-        sources=tuple(args.source),
-        stages=tuple(
-            PackageStage(packages=tuple(stage.split()), target_release=args.target_release)
-            for stage in args.stage
-        ),
-    )
-    print(json.dumps({"prefixes": lock_request(request, args.lock)}))
+    if args.request:
+        if args.base or args.stage or args.source or args.target_release or args.manager:
+            parser.error("--request cannot be combined with individual request flags")
+        request = LockRequest.model_validate_json(args.request.read_text())
+    else:
+        if not args.base or not args.stage:
+            parser.error("--base and --stage are required unless --request is supplied")
+        request = LockRequest(
+            manager=args.manager or "apt",
+            base=args.base,
+            sources=tuple(args.source),
+            stages=tuple(
+                PackageStage(packages=tuple(stage.split()), target_release=args.target_release)
+                for stage in args.stage
+            ),
+        )
+    if args.receipt:
+        from mango.authoring.package_state import resolve_packages, write_receipt
+        value = resolve_packages(request, args.lock)
+        write_receipt(args.receipt, value)
+        prefixes = value["prefixes"]
+    else:
+        prefixes = lock_request(request, args.lock)
+    print(json.dumps({"prefixes": prefixes}))
 
 
 if __name__ == "__main__":

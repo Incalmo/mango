@@ -61,3 +61,20 @@ class CacheArchiveTests(unittest.TestCase):
                 pin_cache_archive(
                     root / "source.tar.gz", root / "out", prefix="npm/cache"
                 )
+
+    @unittest.skipUnless(
+        Path("/dev/shm").is_dir(), "separate temporary filesystem unavailable"
+    )
+    def test_source_and_publication_can_use_different_filesystems(self):
+        with (
+            tempfile.TemporaryDirectory() as source_dir,
+            tempfile.TemporaryDirectory(dir="/dev/shm") as output_dir,
+        ):
+            source, output = Path(source_dir) / "source.tar.gz", Path(output_dir)
+            self.archive(source)
+            if source.stat().st_dev == output.stat().st_dev:
+                self.skipTest("temporary locations use the same filesystem")
+            record = pin_cache_archive(source, output, prefix="npm/cache")
+            self.assertEqual(
+                Path(record["author_source"]).read_bytes(), source.read_bytes()
+            )

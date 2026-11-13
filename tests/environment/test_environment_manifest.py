@@ -203,7 +203,7 @@ class EnvironmentManifestTests(unittest.TestCase):
         self.assertEqual(document["name"], "synthetic")
         self.assertIn("main", document["compose"]["services"])
         self.assertEqual(document["runtime"]["task"], "task")
-        self.assertFalse((self.root.parent / "build").exists())
+        self.assertFalse((self.root.parent / "mango-build").exists())
 
     def test_harbor_arguments_only_with_run(self):
         result = subprocess.run(
@@ -221,7 +221,7 @@ class EnvironmentManifestTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(json.loads(result.stdout)["valid"])
-        self.assertFalse((self.root.parent / "build").exists())
+        self.assertFalse((self.root.parent / "mango-build").exists())
 
 
 class WorkspaceTests(unittest.TestCase):

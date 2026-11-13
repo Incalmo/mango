@@ -3,14 +3,14 @@
 let
   lock = builtins.fromJSON (builtins.readFile lockFile);
   valid = lock.schema_version == 1
-    && builtins.match "(stable|beta|nightly|[0-9]+\\.[0-9]+\\.[0-9]+)" lock.channel != null
-    && builtins.match "[a-zA-Z0-9_-]+" lock.target != null
+    && builtins.match "((stable|beta|nightly)(-[0-9]{4}-[0-9]{2}-[0-9]{2})?|[0-9]+\\.[0-9]+\\.[0-9]+)" lock.channel != null
+    && builtins.match "[a-zA-Z0-9_.-]+" lock.target != null
     && lock.toolchain == "${lock.channel}-${lock.target}"
     && builtins.match "[0-9]{4}-[0-9]{2}-[0-9]{2}" lock.date != null
     && builtins.elem lock.profile [ "minimal" "default" "complete" ]
     && builtins.isList lock.components && lock.components != []
-    && builtins.length lock.components == builtins.length (pkgs.lib.unique (map (component: component.name) lock.components))
-    && builtins.all (name: builtins.elem name (map (component: component.name) lock.components)) [ "rustc" "rust-std" "cargo" ]
+    && builtins.length lock.components == builtins.length (pkgs.lib.unique (map (component: "${component.name}@${component.target or lock.target}") lock.components))
+    && builtins.all (name: builtins.any (component: component.name == name && (component.target or lock.target) == lock.target) lock.components) [ "rustc" "rust-std" "cargo" ]
     && builtins.all (component:
       builtins.match "[a-z0-9_-]+" component.name != null
       && builtins.match "[0-9a-f]{64}" component.sha256 != null

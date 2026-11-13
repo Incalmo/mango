@@ -153,7 +153,7 @@ def launch(argv, parser, stack):
             parser.error(
                 "lock takes no additional arguments; edit mango.lock to upgrade"
             )
-        workspace = (args.workspace or root.parent / "build" / root.name).resolve()
+        workspace = (args.workspace or root.parent / "mango-build" / root.name).resolve()
         if workspace.is_relative_to(root) or root.is_relative_to(workspace):
             parser.error("workspace must be separate from the environment")
         pin = ensure_lock(root)

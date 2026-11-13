@@ -3,6 +3,14 @@
 These tools contact registries and package archives. Run them while authoring;
 commit only their output. Builds read the committed pins and locks offline.
 
+For full repository and package transaction timelines, exact shared authoring
+prefixes and retained APT index replay, see [package state](package-state.md).
+For npm resolution and disconnected lifecycle-script replay, see
+[npm authoring](npm-cache.md).
+For official Rust release manifests and faithful Rustup selector precedence,
+see [Rustup toolchains](rustup-toolchains.md). For exact Go module proxy inputs,
+including fixed-version replacements, see [Go module locks](go-module-locks.md).
+
 ## Pin a base image
 
 ```sh
@@ -164,8 +172,12 @@ For Alpine, use `--manager apk` and explicit `--source` repository URLs.
 The resolver simulates each install inside the pinned base and fetches the
 exact selected package versions (retaining already-installed dependencies),
 verifies each APK signature with that base's trusted keys, and records SHA-256
-hashes under `apk/<key>/<stage>`. Native builds can install the selected
-archives with `apk add --no-network`; signature checking remains enabled.
+hashes under `apk/<key>/<stage>`. The transaction parser supports both apk-tools
+2 and 3 progress formats and rejects unknown package mutations. Native builds
+can replay a `--no-cache` transaction with `h.installApksScript`, passing the
+archive directory followed by the original requested package roots. This keeps
+dependency archives out of `/etc/apk/world`, preserves cache behavior, and keeps
+signature checking enabled while installing without networking.
 Alpine stage requests do not accept apt-specific release or extra-source fields.
 Archive availability is separate from integrity: retain these inputs in a
 binary cache when upstream repositories rotate package versions.
